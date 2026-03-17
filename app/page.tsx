@@ -290,7 +290,7 @@ export default function Page() {
       <div style={shellStyle}>
         <div style={headerStyle}>
           <div>
-            <h1 style={titleStyle}>CFSP Ops Board</h1>
+            <h1 style={titleStyle}>CFSP Ops Board Trial Version</h1>
             <p style={subtitleStyle}>Conflict Free SP · Simulation Operations</p>
           </div>
 
