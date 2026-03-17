@@ -289,10 +289,22 @@ export default function Page() {
     <main style={pageStyle}>
       <div style={shellStyle}>
         <div style={headerStyle}>
-          <div>
-            <h1 style={titleStyle}>CFSP Ops Board Trial Version</h1>
-            <p style={subtitleStyle}>Conflict Free SP · Simulation Operations</p>
-          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+  <img
+    src="/logo.png"
+    alt="CFSP Logo"
+    style={{
+      height: 48,
+      width: "auto",
+      borderRadius: 8,
+    }}
+  />
+
+  <div>
+    <h1 style={titleStyle}>CFSP Ops Board</h1>
+    <p style={subtitleStyle}>Conflict Free SP · Simulation Operations</p>
+  </div>
+</div>
 
           <div style={headerActionsStyle}>
             <div style={fieldBlockStyle}>
