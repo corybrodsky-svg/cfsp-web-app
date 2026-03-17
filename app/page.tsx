@@ -313,11 +313,7 @@ export default function Page() {
       <div style={shellStyle}>
         <section style={topBarStyle}>
           <div style={brandWrapStyle}>
-            <img
-              src="/cfsp-logo.png"
-              alt="CFSP Logo"
-              style={logoStyle}
-            />
+            <img src="/cfsp-logo.png" alt="CFSP Logo" style={logoStyle} />
 
             <div>
               <h1 style={titleStyle}>CFSP Ops Board</h1>
@@ -345,12 +341,12 @@ export default function Page() {
               + New Event
             </Link>
 
-            <Link href="/sps" style={toolbarButtonLinkStyle}>
+            <Link href="/sps" style={toolbarGhostLinkStyle}>
               SP Database
             </Link>
 
             <button
-              style={toolbarButtonStyle}
+              style={toolbarGhostButtonStyle}
               onClick={handleSignOut}
               disabled={signingOut}
             >
@@ -478,7 +474,7 @@ export default function Page() {
           </div>
 
           <div style={formActionsStyle}>
-            <button onClick={handleSaveEvent} style={buttonStyle} disabled={saving}>
+            <button onClick={handleSaveEvent} style={primaryButtonStyle} disabled={saving}>
               {saving
                 ? editingId
                   ? "Updating..."
@@ -488,11 +484,15 @@ export default function Page() {
                   : "Add Event"}
             </button>
 
-            <button onClick={loadEvents} style={buttonStyle} disabled={loading || saving}>
+            <button
+              onClick={loadEvents}
+              style={secondaryButtonStyle}
+              disabled={loading || saving}
+            >
               {loading ? "Refreshing..." : "Refresh"}
             </button>
 
-            <button onClick={clearForm} style={buttonStyle} disabled={saving}>
+            <button onClick={clearForm} style={secondaryButtonStyle} disabled={saving}>
               {editingId ? "Cancel Edit" : "Clear"}
             </button>
           </div>
@@ -681,19 +681,24 @@ const toolbarSelectStyle: React.CSSProperties = {
   outline: "none",
 };
 
-const toolbarButtonStyle: React.CSSProperties = {
+const toolbarButtonLinkStyle: React.CSSProperties = {
   height: 52,
   padding: "0 18px",
   borderRadius: 16,
-  border: "1px solid #d0d5dd",
-  background: "#ffffff",
-  color: "#101828",
+  border: "1px solid #175cd3",
+  background: "#175cd3",
+  color: "#ffffff",
   fontSize: 16,
+  fontWeight: 600,
   cursor: "pointer",
-  boxShadow: "0 1px 2px rgba(16, 24, 40, 0.04)",
+  textDecoration: "none",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  boxShadow: "0 2px 6px rgba(23, 92, 211, 0.25)",
 };
 
-const toolbarButtonLinkStyle: React.CSSProperties = {
+const toolbarGhostLinkStyle: React.CSSProperties = {
   height: 52,
   padding: "0 18px",
   borderRadius: 16,
@@ -706,6 +711,18 @@ const toolbarButtonLinkStyle: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
+  boxShadow: "0 1px 2px rgba(16, 24, 40, 0.04)",
+};
+
+const toolbarGhostButtonStyle: React.CSSProperties = {
+  height: 52,
+  padding: "0 18px",
+  borderRadius: 16,
+  border: "1px solid #d0d5dd",
+  background: "#ffffff",
+  color: "#101828",
+  fontSize: 16,
+  cursor: "pointer",
   boxShadow: "0 1px 2px rgba(16, 24, 40, 0.04)",
 };
 
@@ -796,7 +813,19 @@ const inputStyle: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
-const buttonStyle: React.CSSProperties = {
+const primaryButtonStyle: React.CSSProperties = {
+  padding: "14px 18px",
+  borderRadius: 16,
+  border: "1px solid #175cd3",
+  background: "#175cd3",
+  color: "#ffffff",
+  fontSize: 16,
+  cursor: "pointer",
+  fontWeight: 600,
+  boxShadow: "0 2px 6px rgba(23, 92, 211, 0.25)",
+};
+
+const secondaryButtonStyle: React.CSSProperties = {
   padding: "14px 18px",
   borderRadius: 16,
   border: "1px solid #d0d5dd",
@@ -936,12 +965,11 @@ const spRowStyle: React.CSSProperties = {
 };
 
 const shortagePillStyle: React.CSSProperties = {
-  display: "inline-block",
-  marginLeft: 4,
-  padding: "4px 10px",
+  padding: "6px 12px",
   borderRadius: 999,
-  border: "1px solid #f0c5c1",
+  background: "#ffe4e6",
   color: "#b42318",
-  background: "#fef3f2",
+  fontWeight: 600,
   fontSize: 14,
+  border: "1px solid #fda4af",
 };
