@@ -1,3 +1,4 @@
+<h1 style={{ color: "red" }}>NEW BUILD LIVE</h1>
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
