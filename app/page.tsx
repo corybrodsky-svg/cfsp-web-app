@@ -637,7 +637,7 @@ export default function Page() {
                       </button>
 
                       {short > 0 ? (
-                        <span style={shortagePillStyle}>Short {short}</span>
+                        <span style={shortagePillStyle}>⚠ SHORT {short}</span>
                       ) : (
                         <span style={fullPillStyle}>Fully assigned</span>
                       )}
@@ -932,9 +932,10 @@ const cardsGridStyle: React.CSSProperties = {
 const cardStyle: React.CSSProperties = {
   border: "1px solid #d8e1ec",
   borderRadius: 24,
-  padding: 18,
-  background: "rgba(255, 255, 255, 0.92)",
-  boxShadow: "0 10px 30px rgba(16, 24, 40, 0.06)",
+  padding: 20,
+  background: "#ffffff",
+  boxShadow: "0 12px 30px rgba(16, 24, 40, 0.08)",
+  transition: "all 0.2s ease",
 };
 
 const cardHeaderStyle: React.CSSProperties = {
@@ -1061,9 +1062,9 @@ const shortagePillStyle: React.CSSProperties = {
   borderRadius: 999,
   background: "#ffe4e6",
   color: "#b42318",
-  fontWeight: 600,
+  fontWeight: 700,
   fontSize: 14,
-  border: "1px solid #fda4af",
+  border: "1px solid #f04438",
 };
 
 const fullPillStyle: React.CSSProperties = {
