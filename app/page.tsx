@@ -21,7 +21,7 @@ type EventRow = {
 
 const STATUSES = ["Needs SPs", "Scheduled", "In Progress", "Complete"];
 const VISIBILITIES: Visibility[] = ["team", "personal"];
-
+<h1 style={{ color: "red" }}>TEST UPDATE LIVE</h1>
 function parseNumber(value: string) {
   const n = Number(value);
   if (!Number.isFinite(n)) return 0;
