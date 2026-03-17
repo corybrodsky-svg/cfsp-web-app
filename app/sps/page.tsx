@@ -4,41 +4,34 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../lib/supabaseClient";
 
-type SPRow = {
+type SpStatus = "active" | "inactive";
+
+type SpRow = {
   id: string;
   full_name: string | null;
   email: string | null;
   phone: string | null;
   notes: string | null;
-  active: boolean | null;
+  status: string | null;
   created_at: string | null;
 };
 
-type StatusFilter = "all" | "active" | "inactive";
-
-function normalizeText(value: string | null | undefined) {
-  return (value ?? "").trim().toLowerCase();
+function normalizeStatus(value: string | null): SpStatus {
+  return value?.toLowerCase() === "inactive" ? "inactive" : "active";
 }
 
-function formatPhone(value: string | null) {
-  const raw = (value ?? "").trim();
-  if (!raw) return "-";
+function sortSps(a: SpRow, b: SpRow) {
+  const aActive = normalizeStatus(a.status) === "active" ? 0 : 1;
+  const bActive = normalizeStatus(b.status) === "active" ? 0 : 1;
+  if (aActive !== bActive) return aActive - bActive;
 
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length === 10) {
-    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-  }
-
-  return raw;
+  const nameA = (a.full_name ?? "").toLowerCase();
+  const nameB = (b.full_name ?? "").toLowerCase();
+  return nameA.localeCompare(nameB);
 }
 
-function displayValue(value: string | null) {
-  const clean = (value ?? "").trim();
-  return clean || "-";
-}
-
-export default function SPDatabasePage() {
-  const [sps, setSps] = useState<SPRow[]>([]);
+export default function SpDatabasePage() {
+  const [sps, setSps] = useState<SpRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -47,28 +40,27 @@ export default function SPDatabasePage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
-  const [active, setActive] = useState(true);
+  const [status, setStatus] = useState<SpStatus>("active");
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   async function loadSps() {
     setLoading(true);
 
     const { data, error } = await supabase
       .from("sps")
-      .select("id, full_name, email, phone, notes, active, created_at")
-      .order("full_name", { ascending: true });
+      .select("id, full_name, email, phone, notes, status, created_at")
+      .order("created_at", { ascending: false });
 
     if (error) {
       console.error("Error loading SPs:", error);
-      alert("Could not load SPs.");
+      alert("Could not load SP database.");
       setLoading(false);
       return;
     }
 
-    setSps((data ?? []) as SPRow[]);
+    setSps((data ?? []) as SpRow[]);
     setLoading(false);
   }
 
@@ -81,32 +73,38 @@ export default function SPDatabasePage() {
     setEmail("");
     setPhone("");
     setNotes("");
-    setActive(true);
+    setStatus("active");
     setEditingId(null);
+  }
+
+  function handleEdit(sp: SpRow) {
+    setEditingId(sp.id);
+    setFullName(sp.full_name ?? "");
+    setEmail(sp.email ?? "");
+    setPhone(sp.phone ?? "");
+    setNotes(sp.notes ?? "");
+    setStatus(normalizeStatus(sp.status));
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function handleSave() {
     if (saving) return;
 
     const cleanName = fullName.trim();
-    const cleanEmail = email.trim();
-    const cleanPhone = phone.trim();
-    const cleanNotes = notes.trim();
-
     if (!cleanName) {
-      alert("Please enter the SP name.");
+      alert("Please enter a full name.");
       return;
     }
 
+    setSaving(true);
+
     const payload = {
       full_name: cleanName,
-      email: cleanEmail || null,
-      phone: cleanPhone || null,
-      notes: cleanNotes || null,
-      active,
+      email: email.trim(),
+      phone: phone.trim(),
+      notes: notes.trim(),
+      status,
     };
-
-    setSaving(true);
 
     if (editingId) {
       const { error } = await supabase
@@ -115,19 +113,17 @@ export default function SPDatabasePage() {
         .eq("id", editingId);
 
       if (error) {
-        console.error("Error updating SP:", error);
-        alert("Could not update SP.");
+        console.error("Update SP error:", error);
+        alert("Could not update SP: " + error.message);
         setSaving(false);
         return;
       }
     } else {
-      const { error } = await supabase
-        .from("sps")
-        .insert([payload]);
+      const { error } = await supabase.from("sps").insert([payload]);
 
       if (error) {
-        console.error("Error creating SP:", error);
-        alert("Could not save SP.");
+        console.error("Create SP error:", error);
+        alert("Could not save SP: " + error.message);
         setSaving(false);
         return;
       }
@@ -138,16 +134,6 @@ export default function SPDatabasePage() {
     setSaving(false);
   }
 
-  function handleEdit(sp: SPRow) {
-    setEditingId(sp.id);
-    setFullName(sp.full_name ?? "");
-    setEmail(sp.email ?? "");
-    setPhone(sp.phone ?? "");
-    setNotes(sp.notes ?? "");
-    setActive(sp.active ?? true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
   async function handleDelete(id: string) {
     if (deletingId) return;
 
@@ -156,14 +142,11 @@ export default function SPDatabasePage() {
 
     setDeletingId(id);
 
-    const { error } = await supabase
-      .from("sps")
-      .delete()
-      .eq("id", id);
+    const { error } = await supabase.from("sps").delete().eq("id", id);
 
     if (error) {
-      console.error("Error deleting SP:", error);
-      alert("Could not delete SP.");
+      console.error("Delete SP error:", error);
+      alert("Could not delete SP: " + error.message);
       setDeletingId(null);
       return;
     }
@@ -174,94 +157,48 @@ export default function SPDatabasePage() {
   }
 
   const filteredSps = useMemo(() => {
-    const q = normalizeText(search);
+    const q = search.trim().toLowerCase();
+    const base = [...sps].sort(sortSps);
 
-    return sps.filter((sp) => {
-      const matchesStatus =
-        statusFilter === "all"
-          ? true
-          : statusFilter === "active"
-          ? sp.active === true
-          : sp.active === false;
+    if (!q) return base;
 
-      if (!matchesStatus) return false;
-
-      if (!q) return true;
-
-      const name = normalizeText(sp.full_name);
-      const emailVal = normalizeText(sp.email);
-      const phoneVal = normalizeText(sp.phone);
-      const notesVal = normalizeText(sp.notes);
-
+    return base.filter((sp) => {
       return (
-        name.includes(q) ||
-        emailVal.includes(q) ||
-        phoneVal.includes(q) ||
-        notesVal.includes(q)
+        (sp.full_name ?? "").toLowerCase().includes(q) ||
+        (sp.email ?? "").toLowerCase().includes(q) ||
+        (sp.phone ?? "").toLowerCase().includes(q) ||
+        (sp.notes ?? "").toLowerCase().includes(q)
       );
     });
-  }, [sps, search, statusFilter]);
+  }, [sps, search]);
 
   const stats = useMemo(() => {
     const total = sps.length;
-    const activeCount = sps.filter((sp) => sp.active === true).length;
-    const inactiveCount = sps.filter((sp) => sp.active === false).length;
-    const visibleCount = filteredSps.length;
-
-    return {
-      total,
-      activeCount,
-      inactiveCount,
-      visibleCount,
-    };
-  }, [sps, filteredSps]);
+    const active = sps.filter((sp) => normalizeStatus(sp.status) === "active").length;
+    const inactive = total - active;
+    return { total, active, inactive };
+  }, [sps]);
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#000",
-        color: "#fff",
-        padding: "32px 24px 48px",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: 16,
-            marginBottom: 24,
-            flexWrap: "wrap",
-          }}
-        >
-          <div>
-            <h1 style={{ fontSize: 48, fontWeight: 400, margin: 0 }}>SP Database</h1>
-            <p style={{ marginTop: 8, fontSize: 18, color: "#cfcfcf" }}>
-              Standardized patient roster and contact management
-            </p>
+    <main style={pageStyle}>
+      <div style={shellStyle}>
+        <section style={topBarStyle}>
+          <div style={brandWrapStyle}>
+            <img src="/cfsp-logo.png" alt="CFSP Logo" style={logoStyle} />
+            <div>
+              <h1 style={titleStyle}>SP Database</h1>
+              <p style={subtitleStyle}>Conflict Free SP · Standardized Patient Directory</p>
+            </div>
           </div>
 
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <Link href="/" style={buttonLinkStyle}>
-              Back to Ops Board
+          <div style={toolbarStyle}>
+            <Link href="/" style={toolbarGhostLinkStyle}>
+              ← Back to Board
             </Link>
-            <button onClick={loadSps} style={buttonStyle} disabled={loading || saving}>
-              {loading ? "Refreshing..." : "Refresh"}
-            </button>
           </div>
-        </div>
+        </section>
 
-        <section
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: 12,
-            marginBottom: 22,
-          }}
-        >
+        <section style={statsGridStyle}>
           <div style={statCardStyle}>
             <div style={statLabelStyle}>Total SPs</div>
             <div style={statValueStyle}>{stats.total}</div>
@@ -269,21 +206,23 @@ export default function SPDatabasePage() {
 
           <div style={statCardStyle}>
             <div style={statLabelStyle}>Active</div>
-            <div style={statValueStyle}>{stats.activeCount}</div>
+            <div style={{ ...statValueStyle, color: "#027a48" }}>{stats.active}</div>
           </div>
 
           <div style={statCardStyle}>
             <div style={statLabelStyle}>Inactive</div>
-            <div style={statValueStyle}>{stats.inactiveCount}</div>
-          </div>
-
-          <div style={statCardStyle}>
-            <div style={statLabelStyle}>Showing</div>
-            <div style={statValueStyle}>{stats.visibleCount}</div>
+            <div style={{ ...statValueStyle, color: "#b42318" }}>{stats.inactive}</div>
           </div>
         </section>
 
         <section style={panelStyle}>
+          <div style={panelHeaderStyle}>
+            <div style={panelTitleStyle}>
+              {editingId ? "Edit SP" : "Add SP"}
+            </div>
+            {editingId && <div style={editBadgeStyle}>Editing</div>}
+          </div>
+
           <div style={gridStyle}>
             <div>
               <label style={labelStyle}>Full Name</label>
@@ -291,7 +230,7 @@ export default function SPDatabasePage() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 style={inputStyle}
-                placeholder="Deborah Crane"
+                placeholder="Jane Doe"
               />
             </div>
 
@@ -301,8 +240,7 @@ export default function SPDatabasePage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 style={inputStyle}
-                placeholder="name@email.com"
-                type="email"
+                placeholder="jane@example.com"
               />
             </div>
 
@@ -312,122 +250,105 @@ export default function SPDatabasePage() {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 style={inputStyle}
-                placeholder="555-555-5555"
+                placeholder="(555) 555-5555"
               />
             </div>
 
             <div>
               <label style={labelStyle}>Status</label>
               <select
-                value={active ? "active" : "inactive"}
-                onChange={(e) => setActive(e.target.value === "active")}
+                value={status}
+                onChange={(e) => setStatus(e.target.value as SpStatus)}
                 style={inputStyle}
               >
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </select>
             </div>
+
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={labelStyle}>Notes</label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                style={textareaStyle}
+                placeholder="Casting notes, experience, reminders, availability notes..."
+              />
+            </div>
           </div>
 
-          <div style={{ marginTop: 14 }}>
-            <label style={labelStyle}>Notes</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              style={{ ...inputStyle, minHeight: 100, resize: "vertical" }}
-              placeholder="Accent, special skills, restrictions, reminders..."
-            />
-          </div>
-
-          <div style={{ display: "flex", gap: 12, marginTop: 18, flexWrap: "wrap" }}>
-            <button onClick={handleSave} style={buttonStyle} disabled={saving}>
+          <div style={formActionsStyle}>
+            <button onClick={handleSave} style={primaryButtonStyle} disabled={saving}>
               {saving
                 ? editingId
                   ? "Updating..."
                   : "Saving..."
                 : editingId
-                ? "Update SP"
-                : "Add SP"}
+                  ? "Update SP"
+                  : "Add SP"}
             </button>
 
-            <button onClick={clearForm} style={buttonStyle} disabled={saving}>
+            <button onClick={loadSps} style={secondaryButtonStyle} disabled={loading || saving}>
+              {loading ? "Refreshing..." : "Refresh"}
+            </button>
+
+            <button onClick={clearForm} style={secondaryButtonStyle} disabled={saving}>
               {editingId ? "Cancel Edit" : "Clear"}
             </button>
           </div>
-
-          {editingId && (
-            <p style={{ marginTop: 14, color: "#cfcfcf", fontSize: 14 }}>
-              Editing existing SP. Click “Cancel Edit” to stop.
-            </p>
-          )}
         </section>
 
         <section style={panelStyle}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(260px, 1fr) minmax(220px, 260px)",
-              gap: 14,
-              marginBottom: 14,
-            }}
-          >
-            <div>
-              <label style={labelStyle}>Search</label>
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                style={inputStyle}
-                placeholder="Search by name, email, phone, or notes"
-              />
-            </div>
+          <div style={panelHeaderStyle}>
+            <div style={panelTitleStyle}>Directory</div>
+          </div>
 
-            <div>
-              <label style={labelStyle}>Filter</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-                style={inputStyle}
-              >
-                <option value="all">All SPs</option>
-                <option value="active">Active Only</option>
-                <option value="inactive">Inactive Only</option>
-              </select>
-            </div>
+          <div style={{ marginBottom: 16 }}>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={inputStyle}
+              placeholder="Search name, email, phone, notes..."
+            />
           </div>
 
           {loading ? (
-            <p style={{ color: "#cfcfcf" }}>Loading SPs...</p>
+            <p style={infoTextStyle}>Loading SP database...</p>
           ) : filteredSps.length === 0 ? (
-            <section style={emptyStateStyle}>
-              <h2 style={{ marginTop: 0, marginBottom: 8 }}>No SPs found</h2>
-              <p style={{ margin: 0, color: "#cfcfcf" }}>
-                Add a new SP above, or change your search/filter settings.
-              </p>
-            </section>
+            <div style={emptyStateStyle}>
+              <h2 style={emptyTitleStyle}>No SPs found</h2>
+              <p style={emptyTextStyle}>Add your first SP above, or change the search.</p>
+            </div>
           ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
-                gap: 16,
-              }}
-            >
+            <section style={cardsGridStyle}>
               {filteredSps.map((sp) => {
-                const isDeleting = deletingId === sp.id;
+                const isInactive = normalizeStatus(sp.status) === "inactive";
 
                 return (
-                  <article key={sp.id} style={cardStyle}>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                      <div>
-                        <h2 style={{ margin: 0, fontSize: 22 }}>
-                          {displayValue(sp.full_name)}
-                        </h2>
-                        <div style={pillStyle}>
-                          {sp.active ? "Active" : "Inactive"}
+                  <article
+                    key={sp.id}
+                    style={{
+                      ...cardStyle,
+                      opacity: isInactive ? 0.8 : 1,
+                    }}
+                  >
+                    <div style={cardHeaderStyle}>
+                      <div style={{ minWidth: 0 }}>
+                        <h2 style={cardTitleStyle}>{sp.full_name || "Unnamed SP"}</h2>
+
+                        <div style={cardMetaRowStyle}>
+                          <span
+                            style={{
+                              ...statusPillBaseStyle,
+                              ...(isInactive ? inactivePillStyle : activePillStyle),
+                            }}
+                          >
+                            {isInactive ? "Inactive" : "Active"}
+                          </span>
                         </div>
                       </div>
 
-                      <div style={{ display: "flex", gap: 8 }}>
+                      <div style={cardActionsStyle}>
                         <button
                           onClick={() => handleEdit(sp)}
                           style={iconButtonStyle}
@@ -436,32 +357,40 @@ export default function SPDatabasePage() {
                         >
                           ✎
                         </button>
+
                         <button
                           onClick={() => handleDelete(sp.id)}
-                          style={iconButtonStyle}
+                          style={dangerIconButtonStyle}
                           title="Delete"
                           disabled={saving || !!deletingId}
                         >
-                          {isDeleting ? "…" : "🗑"}
+                          {deletingId === sp.id ? "…" : "🗑"}
                         </button>
                       </div>
                     </div>
 
-                    <div style={{ marginTop: 18, lineHeight: 1.8, fontSize: 16 }}>
-                      <div>
-                        <strong>Email:</strong> {displayValue(sp.email)}
-                      </div>
-                      <div>
-                        <strong>Phone:</strong> {formatPhone(sp.phone)}
-                      </div>
-                      <div>
-                        <strong>Notes:</strong> {displayValue(sp.notes)}
+                    <div style={cardBodyStyle}>
+                      <div style={infoGridStyle}>
+                        <div style={infoCellStyle}>
+                          <div style={infoLabelStyle}>Email</div>
+                          <div style={infoValueStyleSmall}>{sp.email || "-"}</div>
+                        </div>
+
+                        <div style={infoCellStyle}>
+                          <div style={infoLabelStyle}>Phone</div>
+                          <div style={infoValueStyleSmall}>{sp.phone || "-"}</div>
+                        </div>
+
+                        <div style={{ ...infoCellStyle, gridColumn: "1 / -1" }}>
+                          <div style={infoLabelStyle}>Notes</div>
+                          <div style={infoValueStyleSmall}>{sp.notes || "-"}</div>
+                        </div>
                       </div>
                     </div>
                   </article>
                 );
               })}
-            </div>
+            </section>
           )}
         </section>
       </div>
@@ -469,44 +398,141 @@ export default function SPDatabasePage() {
   );
 }
 
-const panelStyle: React.CSSProperties = {
-  border: "1px solid #2e2e2e",
-  borderRadius: 24,
-  padding: 18,
-  marginBottom: 22,
-  background: "#0b0b0b",
+const pageStyle: React.CSSProperties = {
+  minHeight: "100vh",
+  background: "linear-gradient(180deg, #f8fafc 0%, #eef4fb 50%, #e9f0f8 100%)",
+  color: "#101828",
+  padding: "24px 24px 40px",
+  fontFamily:
+    '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
 };
 
-const cardStyle: React.CSSProperties = {
-  border: "1px solid #2e2e2e",
-  borderRadius: 24,
-  padding: 18,
-  background: "#0f0f0f",
+const shellStyle: React.CSSProperties = {
+  maxWidth: 1320,
+  margin: "0 auto",
+};
+
+const topBarStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 20,
+  marginBottom: 24,
+  flexWrap: "wrap",
+  padding: "10px 4px 2px",
+};
+
+const brandWrapStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 18,
+  minWidth: 0,
+};
+
+const logoStyle: React.CSSProperties = {
+  height: 92,
+  width: "auto",
+  objectFit: "contain",
+  borderRadius: 12,
+  flexShrink: 0,
+};
+
+const titleStyle: React.CSSProperties = {
+  fontSize: 42,
+  fontWeight: 700,
+  margin: 0,
+  lineHeight: 1.05,
+  color: "#0f172a",
+  letterSpacing: "-0.02em",
+};
+
+const subtitleStyle: React.CSSProperties = {
+  margin: "8px 0 0 0",
+  fontSize: 16,
+  color: "#475467",
+};
+
+const toolbarStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  flexWrap: "wrap",
+};
+
+const toolbarGhostLinkStyle: React.CSSProperties = {
+  height: 52,
+  padding: "0 18px",
+  borderRadius: 16,
+  border: "1px solid #d0d5dd",
+  background: "#ffffff",
+  color: "#101828",
+  fontSize: 16,
+  cursor: "pointer",
+  textDecoration: "none",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const statsGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: 12,
+  marginBottom: 22,
 };
 
 const statCardStyle: React.CSSProperties = {
-  border: "1px solid #2e2e2e",
+  border: "1px solid #d8e1ec",
   borderRadius: 20,
   padding: "16px 18px",
-  background: "#0d0d0d",
+  background: "rgba(255,255,255,0.85)",
+  boxShadow: "0 10px 30px rgba(16, 24, 40, 0.06)",
 };
 
 const statLabelStyle: React.CSSProperties = {
-  color: "#cfcfcf",
+  color: "#667085",
   fontSize: 13,
   marginBottom: 8,
 };
 
 const statValueStyle: React.CSSProperties = {
   fontSize: 30,
-  fontWeight: 600,
+  fontWeight: 700,
+  color: "#101828",
 };
 
-const emptyStateStyle: React.CSSProperties = {
-  border: "1px solid #2e2e2e",
+const panelStyle: React.CSSProperties = {
+  border: "1px solid #d8e1ec",
   borderRadius: 24,
-  padding: 24,
-  background: "#0b0b0b",
+  padding: 18,
+  marginBottom: 22,
+  background: "rgba(255,255,255,0.9)",
+  boxShadow: "0 10px 30px rgba(16, 24, 40, 0.06)",
+};
+
+const panelHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  marginBottom: 16,
+  flexWrap: "wrap",
+};
+
+const panelTitleStyle: React.CSSProperties = {
+  fontSize: 18,
+  fontWeight: 700,
+  color: "#101828",
+};
+
+const editBadgeStyle: React.CSSProperties = {
+  padding: "6px 10px",
+  borderRadius: 999,
+  fontSize: 13,
+  fontWeight: 600,
+  color: "#175cd3",
+  background: "#eff8ff",
+  border: "1px solid #b2ddff",
 };
 
 const gridStyle: React.CSSProperties = {
@@ -518,61 +544,199 @@ const gridStyle: React.CSSProperties = {
 const labelStyle: React.CSSProperties = {
   display: "block",
   marginBottom: 8,
-  color: "#cfcfcf",
+  color: "#475467",
   fontSize: 14,
+  fontWeight: 600,
 };
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "14px 16px",
   borderRadius: 16,
-  border: "1px solid #333",
-  background: "#050505",
-  color: "#fff",
+  border: "1px solid #d0d5dd",
+  background: "#ffffff",
+  color: "#101828",
   fontSize: 16,
   outline: "none",
   boxSizing: "border-box",
 };
 
-const buttonStyle: React.CSSProperties = {
-  padding: "14px 18px",
+const textareaStyle: React.CSSProperties = {
+  width: "100%",
+  minHeight: 110,
+  padding: "14px 16px",
   borderRadius: 16,
-  border: "1px solid #3a3a3a",
-  background: "#1a1a1a",
-  color: "#fff",
+  border: "1px solid #d0d5dd",
+  background: "#ffffff",
+  color: "#101828",
   fontSize: 16,
-  cursor: "pointer",
+  outline: "none",
+  boxSizing: "border-box",
+  resize: "vertical",
 };
 
-const buttonLinkStyle: React.CSSProperties = {
-  padding: "14px 18px",
+const primaryButtonStyle: React.CSSProperties = {
+  padding: "14px 20px",
   borderRadius: 16,
-  border: "1px solid #3a3a3a",
-  background: "#1a1a1a",
-  color: "#fff",
+  border: "none",
+  background: "linear-gradient(135deg, #175cd3, #1849a9)",
+  color: "#ffffff",
   fontSize: 16,
   cursor: "pointer",
-  textDecoration: "none",
-  display: "inline-block",
+  fontWeight: 700,
+  boxShadow: "0 6px 16px rgba(23, 92, 211, 0.35)",
+};
+
+const secondaryButtonStyle: React.CSSProperties = {
+  padding: "14px 18px",
+  borderRadius: 16,
+  border: "1px solid #d0d5dd",
+  background: "#ffffff",
+  color: "#101828",
+  fontSize: 16,
+  cursor: "pointer",
+  boxShadow: "0 1px 2px rgba(16, 24, 40, 0.04)",
+};
+
+const formActionsStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 12,
+  marginTop: 18,
+  flexWrap: "wrap",
+};
+
+const infoTextStyle: React.CSSProperties = {
+  color: "#475467",
+};
+
+const emptyStateStyle: React.CSSProperties = {
+  border: "1px solid #d8e1ec",
+  borderRadius: 24,
+  padding: 24,
+  background: "rgba(255,255,255,0.88)",
+  boxShadow: "0 10px 30px rgba(16, 24, 40, 0.06)",
+};
+
+const emptyTitleStyle: React.CSSProperties = {
+  marginTop: 0,
+  marginBottom: 8,
+  color: "#101828",
+};
+
+const emptyTextStyle: React.CSSProperties = {
+  margin: 0,
+  color: "#667085",
+};
+
+const cardsGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))",
+  gap: 16,
+};
+
+const cardStyle: React.CSSProperties = {
+  border: "1px solid #d8e1ec",
+  borderRadius: 24,
+  padding: 18,
+  background: "rgba(255,255,255,0.92)",
+  boxShadow: "0 10px 30px rgba(16, 24, 40, 0.06)",
+};
+
+const cardHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+};
+
+const cardTitleStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 24,
+  color: "#101828",
+  lineHeight: 1.2,
+};
+
+const cardMetaRowStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 8,
+  flexWrap: "wrap",
+  marginTop: 12,
+};
+
+const cardActionsStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 8,
+};
+
+const cardBodyStyle: React.CSSProperties = {
+  marginTop: 18,
+  color: "#101828",
+};
+
+const infoGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 12,
+};
+
+const infoCellStyle: React.CSSProperties = {
+  padding: "12px 14px",
+  borderRadius: 16,
+  background: "#f8fafc",
+  border: "1px solid #e4e7ec",
+};
+
+const infoLabelStyle: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: "0.03em",
+  color: "#667085",
+  marginBottom: 6,
+};
+
+const infoValueStyleSmall: React.CSSProperties = {
+  fontSize: 16,
+  fontWeight: 500,
+  color: "#101828",
+  wordBreak: "break-word",
 };
 
 const iconButtonStyle: React.CSSProperties = {
   width: 42,
   height: 42,
   borderRadius: 14,
-  border: "1px solid #3a3a3a",
-  background: "#1a1a1a",
-  color: "#fff",
+  border: "1px solid #d0d5dd",
+  background: "#ffffff",
+  color: "#101828",
   cursor: "pointer",
   fontSize: 18,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 0,
 };
 
-const pillStyle: React.CSSProperties = {
+const dangerIconButtonStyle: React.CSSProperties = {
+  ...iconButtonStyle,
+  color: "#b42318",
+};
+
+const statusPillBaseStyle: React.CSSProperties = {
   display: "inline-block",
-  marginTop: 12,
   padding: "6px 10px",
   borderRadius: 999,
-  border: "1px solid #474747",
-  color: "#d7d7d7",
   fontSize: 14,
+  fontWeight: 600,
+};
+
+const activePillStyle: React.CSSProperties = {
+  background: "#ecfdf3",
+  color: "#027a48",
+  border: "1px solid #75e0a7",
+};
+
+const inactivePillStyle: React.CSSProperties = {
+  background: "#fef3f2",
+  color: "#b42318",
+  border: "1px solid #fda29b",
 };
