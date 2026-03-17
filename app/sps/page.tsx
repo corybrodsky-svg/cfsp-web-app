@@ -187,7 +187,9 @@ export default function SpDatabasePage() {
             <img src="/cfsp-logo.png" alt="CFSP Logo" style={logoStyle} />
             <div>
               <h1 style={titleStyle}>SP Database</h1>
-              <p style={subtitleStyle}>Conflict Free SP · Standardized Patient Directory</p>
+              <p style={subtitleStyle}>
+                Conflict Free SP · Standardized Patient Directory
+              </p>
             </div>
           </div>
 
@@ -217,9 +219,7 @@ export default function SpDatabasePage() {
 
         <section style={panelStyle}>
           <div style={panelHeaderStyle}>
-            <div style={panelTitleStyle}>
-              {editingId ? "Edit SP" : "Add SP"}
-            </div>
+            <div style={panelTitleStyle}>{editingId ? "Edit SP" : "Add SP"}</div>
             {editingId && <div style={editBadgeStyle}>Editing</div>}
           </div>
 
@@ -329,7 +329,7 @@ export default function SpDatabasePage() {
                     key={sp.id}
                     style={{
                       ...cardStyle,
-                      opacity: isInactive ? 0.8 : 1,
+                      opacity: isInactive ? 0.82 : 1,
                     }}
                   >
                     <div style={cardHeaderStyle}>
