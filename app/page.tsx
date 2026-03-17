@@ -351,7 +351,7 @@ export default function Page() {
             <img src="/cfsp-logo.png" alt="CFSP Logo" style={logoStyle} />
 
             <div>
-              <h1 style={titleStyle}>CFSP Ops Board</h1>
+              <h1 style={titleStyle}>CFSP Ops Board TEST</h1>
               <p style={subtitleStyle}>
                 Conflict Free SP · Simulation Operations
               </p>
