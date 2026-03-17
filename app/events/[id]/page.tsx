@@ -227,8 +227,8 @@ export default function EventDetailsPage() {
         <section style={topBarStyle}>
           <div style={brandWrapStyle}>
             <img src="/cfsp-logo.png" alt="CFSP Logo" style={logoStyle} />
-           <Link href={`/events/${event.id}`} style={detailsButtonStyle}>
-  Details
+           <Link href="/" style={toolbarGhostLinkStyle}>
+  ← Back to Board
 </Link>
           </div>
 
