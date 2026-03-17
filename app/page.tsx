@@ -3,20 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "./lib/supabaseClient";
-<Link
-  href="/events/new"
-  style={{
-    display: "inline-block",
-    padding: "10px 14px",
-    border: "1px solid #ccc",
-    borderRadius: "8px",
-    textDecoration: "none",
-    color: "#111",
-    marginBottom: "16px",
-  }}
->
-  + New Event
-</Link>
+
 type Visibility = "team" | "personal";
 type ViewFilter = "all" | Visibility;
 
@@ -110,7 +97,9 @@ export default function Page() {
 
     const { data, error } = await supabase
       .from("events")
-      .select("id, name, status, date_text, sp_needed, sp_assigned, visibility, created_at")
+      .select(
+        "id, name, status, date_text, sp_needed, sp_assigned, visibility, created_at"
+      )
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -283,43 +272,30 @@ export default function Page() {
     const needsSps = filteredEvents.filter(
       (e) => (e.status ?? "").toLowerCase() === "needs sps"
     ).length;
-    const totalNeeded = filteredEvents.reduce((sum, e) => sum + (e.sp_needed ?? 0), 0);
-    const totalAssigned = filteredEvents.reduce((sum, e) => sum + (e.sp_assigned ?? 0), 0);
+    const totalNeeded = filteredEvents.reduce(
+      (sum, e) => sum + (e.sp_needed ?? 0),
+      0
+    );
+    const totalAssigned = filteredEvents.reduce(
+      (sum, e) => sum + (e.sp_assigned ?? 0),
+      0
+    );
     const totalShort = filteredEvents.reduce((sum, e) => sum + shortage(e), 0);
 
     return { total, needsSps, totalNeeded, totalAssigned, totalShort };
   }, [filteredEvents]);
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#000",
-        color: "#fff",
-        padding: "32px 24px 48px",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: 16,
-            marginBottom: 24,
-            flexWrap: "wrap",
-          }}
-        >
+    <main style={pageStyle}>
+      <div style={shellStyle}>
+        <div style={headerStyle}>
           <div>
-            <h1 style={{ fontSize: 56, fontWeight: 400, margin: 0 }}>CFSP Ops Board</h1>
-            <p style={{ marginTop: 8, fontSize: 18, color: "#cfcfcf" }}>
-              Conflict Free SP · Simulation Operations
-            </p>
+            <h1 style={titleStyle}>CFSP Ops Board</h1>
+            <p style={subtitleStyle}>Conflict Free SP · Simulation Operations</p>
           </div>
 
-          <div style={{ display: "flex", alignItems: "end", gap: 12, flexWrap: "wrap" }}>
-            <div>
+          <div style={headerActionsStyle}>
+            <div style={fieldBlockStyle}>
               <label style={labelStyle}>View</label>
               <select
                 value={view}
@@ -332,24 +308,21 @@ export default function Page() {
               </select>
             </div>
 
+            <Link href="/events/new" style={buttonLinkStyle}>
+              + New Event
+            </Link>
+
             <Link href="/sps" style={buttonLinkStyle}>
               SP Database
             </Link>
 
-            <button style={{ ...buttonStyle, opacity: 0.6, cursor: "default" }}>
+            <button style={{ ...buttonStyle, opacity: 0.7, cursor: "default" }}>
               Sign out
             </button>
           </div>
         </div>
 
-        <section
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: 12,
-            marginBottom: 22,
-          }}
-        >
+        <section style={statsGridStyle}>
           <div style={statCardStyle}>
             <div style={statLabelStyle}>Visible Events</div>
             <div style={statValueStyle}>{stats.total}</div>
@@ -372,7 +345,12 @@ export default function Page() {
 
           <div style={statCardStyle}>
             <div style={statLabelStyle}>Total Short</div>
-            <div style={{ ...statValueStyle, color: stats.totalShort > 0 ? "#ffb3b3" : "#fff" }}>
+            <div
+              style={{
+                ...statValueStyle,
+                color: stats.totalShort > 0 ? "#b42318" : "#101828",
+              }}
+            >
               {stats.totalShort}
             </div>
           </div>
@@ -455,7 +433,7 @@ export default function Page() {
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 12, marginTop: 18, flexWrap: "wrap" }}>
+          <div style={formActionsStyle}>
             <button onClick={handleSaveEvent} style={buttonStyle} disabled={saving}>
               {saving
                 ? editingId
@@ -476,47 +454,42 @@ export default function Page() {
           </div>
 
           {editingId && (
-            <p style={{ marginTop: 14, color: "#cfcfcf", fontSize: 14 }}>
+            <p style={editingNoteStyle}>
               Editing existing event. Click “Cancel Edit” to stop.
             </p>
           )}
         </section>
 
         {loading ? (
-          <p style={{ color: "#cfcfcf" }}>Loading events...</p>
+          <p style={infoTextStyle}>Loading events...</p>
         ) : filteredEvents.length === 0 ? (
           <section style={emptyStateStyle}>
-            <h2 style={{ marginTop: 0, marginBottom: 8 }}>No events to show</h2>
-            <p style={{ margin: 0, color: "#cfcfcf" }}>
+            <h2 style={{ marginTop: 0, marginBottom: 8, color: "#101828" }}>
+              No events to show
+            </h2>
+            <p style={{ margin: 0, color: "#667085" }}>
               Add your first event above, or change the current view filter.
             </p>
           </section>
         ) : (
-          <section
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))",
-              gap: 16,
-            }}
-          >
+          <section style={cardsGridStyle}>
             {filteredEvents.map((event) => {
               const short = shortage(event);
-              const isDeleting = deletingId === event.id;
 
               return (
                 <article key={event.id} style={cardStyle}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                  <div style={cardHeaderStyle}>
                     <div>
-                      <h2 style={{ margin: 0, fontSize: 22 }}>
-                        {event.name || "Untitled Event"}
-                      </h2>
+                      <h2 style={cardTitleStyle}>{event.name || "Untitled Event"}</h2>
 
                       <div style={pillStyle}>
-                        {normalizedVisibility(event.visibility) === "personal" ? "Personal" : "Team"}
+                        {normalizedVisibility(event.visibility) === "personal"
+                          ? "Personal"
+                          : "Team"}
                       </div>
                     </div>
 
-                    <div style={{ display: "flex", gap: 8 }}>
+                    <div style={cardActionsStyle}>
                       <Link href={`/events/${event.id}`} style={miniLinkStyle}>
                         Details
                       </Link>
@@ -532,16 +505,16 @@ export default function Page() {
 
                       <button
                         onClick={() => handleDelete(event.id)}
-                        style={iconButtonStyle}
+                        style={dangerIconButtonStyle}
                         title="Delete"
                         disabled={saving || !!deletingId}
                       >
-                        🗑
+                        {deletingId === event.id ? "…" : "🗑"}
                       </button>
                     </div>
                   </div>
 
-                  <div style={{ marginTop: 18, lineHeight: 1.8, fontSize: 18 }}>
+                  <div style={cardBodyStyle}>
                     <div>
                       <strong>Status:</strong> {event.status || "-"}
                     </div>
@@ -550,9 +523,10 @@ export default function Page() {
                       <strong>Date:</strong> {event.date_text || "-"}
                     </div>
 
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+                    <div style={spRowStyle}>
                       <div>
-                        <strong>SPs:</strong> {event.sp_assigned ?? 0} / {event.sp_needed ?? 0}
+                        <strong>SPs:</strong> {event.sp_assigned ?? 0} /{" "}
+                        {event.sp_needed ?? 0}
                       </div>
 
                       <button
@@ -573,9 +547,7 @@ export default function Page() {
                         +
                       </button>
 
-                      {short > 0 && (
-                        <span style={shortagePillStyle}>Short {short}</span>
-                      )}
+                      {short > 0 && <span style={shortagePillStyle}>Short {short}</span>}
                     </div>
                   </div>
                 </article>
@@ -588,30 +560,72 @@ export default function Page() {
   );
 }
 
-const panelStyle: React.CSSProperties = {
-  border: "1px solid #2e2e2e",
-  borderRadius: 24,
-  padding: 18,
-  marginBottom: 22,
-  background: "#0b0b0b",
+const pageStyle: React.CSSProperties = {
+  minHeight: "100vh",
+  background: "linear-gradient(180deg, #f8fafc 0%, #eef4fb 50%, #e9f0f8 100%)",
+  color: "#101828",
+  padding: "32px 24px 48px",
+  fontFamily:
+    '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
 };
 
-const cardStyle: React.CSSProperties = {
-  border: "1px solid #2e2e2e",
-  borderRadius: 24,
-  padding: 18,
-  background: "#0f0f0f",
+const shellStyle: React.CSSProperties = {
+  maxWidth: 1280,
+  margin: "0 auto",
+};
+
+const headerStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: 16,
+  marginBottom: 24,
+  flexWrap: "wrap",
+};
+
+const titleStyle: React.CSSProperties = {
+  fontSize: 56,
+  fontWeight: 400,
+  margin: 0,
+  color: "#101828",
+};
+
+const subtitleStyle: React.CSSProperties = {
+  marginTop: 8,
+  fontSize: 18,
+  color: "#475467",
+};
+
+const headerActionsStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "flex-end",
+  gap: 12,
+  flexWrap: "wrap",
+};
+
+const fieldBlockStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+};
+
+const statsGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: 12,
+  marginBottom: 22,
 };
 
 const statCardStyle: React.CSSProperties = {
-  border: "1px solid #2e2e2e",
+  border: "1px solid #d8e1ec",
   borderRadius: 20,
   padding: "16px 18px",
-  background: "#0d0d0d",
+  background: "rgba(255, 255, 255, 0.85)",
+  boxShadow: "0 10px 30px rgba(16, 24, 40, 0.06)",
 };
 
 const statLabelStyle: React.CSSProperties = {
-  color: "#cfcfcf",
+  color: "#667085",
   fontSize: 13,
   marginBottom: 8,
 };
@@ -619,13 +633,24 @@ const statLabelStyle: React.CSSProperties = {
 const statValueStyle: React.CSSProperties = {
   fontSize: 30,
   fontWeight: 600,
+  color: "#101828",
+};
+
+const panelStyle: React.CSSProperties = {
+  border: "1px solid #d8e1ec",
+  borderRadius: 24,
+  padding: 18,
+  marginBottom: 22,
+  background: "rgba(255, 255, 255, 0.88)",
+  boxShadow: "0 10px 30px rgba(16, 24, 40, 0.06)",
 };
 
 const emptyStateStyle: React.CSSProperties = {
-  border: "1px solid #2e2e2e",
+  border: "1px solid #d8e1ec",
   borderRadius: 24,
   padding: 24,
-  background: "#0b0b0b",
+  background: "rgba(255, 255, 255, 0.88)",
+  boxShadow: "0 10px 30px rgba(16, 24, 40, 0.06)",
 };
 
 const gridStyle: React.CSSProperties = {
@@ -637,50 +662,55 @@ const gridStyle: React.CSSProperties = {
 const labelStyle: React.CSSProperties = {
   display: "block",
   marginBottom: 8,
-  color: "#cfcfcf",
+  color: "#475467",
   fontSize: 14,
+  fontWeight: 600,
 };
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "14px 16px",
   borderRadius: 16,
-  border: "1px solid #333",
-  background: "#050505",
-  color: "#fff",
+  border: "1px solid #d0d5dd",
+  background: "#ffffff",
+  color: "#101828",
   fontSize: 16,
   outline: "none",
+  boxSizing: "border-box",
 };
 
 const buttonStyle: React.CSSProperties = {
   padding: "14px 18px",
   borderRadius: 16,
-  border: "1px solid #3a3a3a",
-  background: "#1a1a1a",
-  color: "#fff",
+  border: "1px solid #d0d5dd",
+  background: "#ffffff",
+  color: "#101828",
   fontSize: 16,
   cursor: "pointer",
+  textDecoration: "none",
 };
 
 const buttonLinkStyle: React.CSSProperties = {
   padding: "14px 18px",
   borderRadius: 16,
-  border: "1px solid #3a3a3a",
-  background: "#1a1a1a",
-  color: "#fff",
+  border: "1px solid #d0d5dd",
+  background: "#ffffff",
+  color: "#101828",
   fontSize: 16,
   cursor: "pointer",
   textDecoration: "none",
-  display: "inline-block",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
 };
 
 const miniLinkStyle: React.CSSProperties = {
   height: 42,
   padding: "0 14px",
   borderRadius: 14,
-  border: "1px solid #3a3a3a",
-  background: "#1a1a1a",
-  color: "#fff",
+  border: "1px solid #d0d5dd",
+  background: "#ffffff",
+  color: "#101828",
   cursor: "pointer",
   fontSize: 15,
   textDecoration: "none",
@@ -693,9 +723,9 @@ const iconButtonStyle: React.CSSProperties = {
   width: 42,
   height: 42,
   borderRadius: 14,
-  border: "1px solid #3a3a3a",
-  background: "#1a1a1a",
-  color: "#fff",
+  border: "1px solid #d0d5dd",
+  background: "#ffffff",
+  color: "#101828",
   cursor: "pointer",
   fontSize: 18,
   display: "inline-flex",
@@ -704,23 +734,92 @@ const iconButtonStyle: React.CSSProperties = {
   padding: 0,
 };
 
+const dangerIconButtonStyle: React.CSSProperties = {
+  ...iconButtonStyle,
+  color: "#b42318",
+};
+
+const formActionsStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 12,
+  marginTop: 18,
+  flexWrap: "wrap",
+};
+
+const editingNoteStyle: React.CSSProperties = {
+  marginTop: 14,
+  color: "#475467",
+  fontSize: 14,
+};
+
+const infoTextStyle: React.CSSProperties = {
+  color: "#475467",
+};
+
+const cardsGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))",
+  gap: 16,
+};
+
+const cardStyle: React.CSSProperties = {
+  border: "1px solid #d8e1ec",
+  borderRadius: 24,
+  padding: 18,
+  background: "rgba(255, 255, 255, 0.92)",
+  boxShadow: "0 10px 30px rgba(16, 24, 40, 0.06)",
+};
+
+const cardHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+};
+
+const cardTitleStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 22,
+  color: "#101828",
+};
+
+const cardActionsStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 8,
+};
+
+const cardBodyStyle: React.CSSProperties = {
+  marginTop: 18,
+  lineHeight: 1.8,
+  fontSize: 18,
+  color: "#101828",
+};
+
 const pillStyle: React.CSSProperties = {
   display: "inline-block",
   marginTop: 12,
   padding: "6px 10px",
   borderRadius: 999,
-  border: "1px solid #474747",
-  color: "#d7d7d7",
+  border: "1px solid #d0d5dd",
+  color: "#475467",
   fontSize: 14,
+  background: "#f8fafc",
+};
+
+const spRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  marginTop: 8,
+  flexWrap: "wrap",
 };
 
 const shortagePillStyle: React.CSSProperties = {
   display: "inline-block",
-  marginLeft: 12,
+  marginLeft: 4,
   padding: "4px 10px",
   borderRadius: 999,
-  border: "1px solid #7a3a3a",
-  color: "#ffb3b3",
-  background: "rgba(140, 40, 40, 0.18)",
+  border: "1px solid #f0c5c1",
+  color: "#b42318",
+  background: "#fef3f2",
   fontSize: 14,
 };
