@@ -290,15 +290,11 @@ export default function Page() {
       <div style={shellStyle}>
         <div style={headerStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-  <img
-    src="/logo.png"
-    alt="CFSP Logo"
-    style={{
-      height: 48,
-      width: "auto",
-      borderRadius: 8,
-    }}
-  />
+ <img
+  src="/cfsp-logo.png"
+  alt="CFSP Logo"
+  style={{ height: 60, width: "auto" }}
+/>
 
   <div>
     <h1 style={titleStyle}>CFSP Ops Board</h1>
