@@ -1,5 +1,5 @@
-<h1 style={{ color: "red" }}>NEW BUILD LIVE</h1>
 "use client";
+
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -21,7 +21,7 @@ type EventRow = {
 
 const STATUSES = ["Needs SPs", "Scheduled", "In Progress", "Complete"];
 const VISIBILITIES: Visibility[] = ["team", "personal"];
-<h1 style={{ color: "red" }}>TEST UPDATE LIVE</h1>
+
 function parseNumber(value: string) {
   const n = Number(value);
   if (!Number.isFinite(n)) return 0;
@@ -40,6 +40,7 @@ function normalizedVisibility(value: string | null): Visibility {
 
 function normalizeText(value: string | null | undefined) {
   return (value ?? "").trim().toLowerCase();
+
 }
 
 function duplicateKey(event: EventRow) {
@@ -325,9 +326,11 @@ export default function Page() {
   const liveShortage = Math.max(liveNeeded - liveAssigned, 0);
   const assignedTooHigh = liveAssigned > liveNeeded;
 
-  return (
+ return (
+  <>
+    <h1 style={{ color: "red" }}>TEST UPDATE LIVE</h1>
+
     <main style={pageStyle}>
-      <div style={backgroundGlowStyle} />
       <div style={appShellStyle}>
         <div style={headerWrapStyle}>
           <div style={{ flex: 1, minWidth: 260 }}>
@@ -661,8 +664,8 @@ export default function Page() {
         )}
       </div>
     </main>
-  );
-}
+  </>
+);
 
 const pageStyle: React.CSSProperties = {
   minHeight: "100vh",
