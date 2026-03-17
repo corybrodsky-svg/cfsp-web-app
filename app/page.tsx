@@ -80,6 +80,7 @@ export default function Page() {
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [name, setName] = useState("");
@@ -140,6 +141,11 @@ export default function Page() {
       return;
     }
 
+    if (!cleanDateText) {
+      alert("Please enter a date.");
+      return;
+    }
+
     if (assigned > needed) {
       alert("SP Assigned cannot be greater than SP Needed.");
       return;
@@ -173,7 +179,7 @@ export default function Page() {
 
       if (error) {
         console.error("Error creating event:", error);
-        alert("Could not save event.");
+        alert("Could not save event: " + error.message);
         setSaving(false);
         return;
       }
@@ -196,7 +202,6 @@ export default function Page() {
       .from("events")
       .update({
         sp_assigned: nextAssigned,
-        updated_at: new Date().toISOString(),
       })
       .eq("id", event.id);
 
@@ -232,7 +237,7 @@ export default function Page() {
 
     if (error) {
       console.error("Error deleting event:", error);
-      alert("Could not delete event.");
+      alert("Could not delete event: " + error.message);
       setDeletingId(null);
       return;
     }
@@ -240,6 +245,23 @@ export default function Page() {
     if (editingId === id) clearForm();
     await loadEvents();
     setDeletingId(null);
+  }
+
+  async function handleSignOut() {
+    if (signingOut) return;
+
+    setSigningOut(true);
+
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      console.error("Sign out error:", error);
+      alert("Could not sign out: " + error.message);
+      setSigningOut(false);
+      return;
+    }
+
+    window.location.href = "/login";
   }
 
   const filteredEvents = useMemo(() => {
@@ -253,6 +275,7 @@ export default function Page() {
 
     for (const event of visible) {
       const key = duplicateKey(event);
+
       if (!key || key === "||team") {
         deduped.push(event);
         continue;
@@ -288,27 +311,29 @@ export default function Page() {
   return (
     <main style={pageStyle}>
       <div style={shellStyle}>
-        <div style={headerStyle}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-<img
-  src="/cfsp-logo.png"
-  alt="CFSP Logo"
-  style={{ height: 60, width: "auto" }}
-/>
+        <section style={topBarStyle}>
+          <div style={brandWrapStyle}>
+            <img
+              src="/cfsp-logo.png"
+              alt="CFSP Logo"
+              style={logoStyle}
+            />
 
-  <div>
-    <h1 style={titleStyle}>CFSP Ops Board</h1>
-    <p style={subtitleStyle}>Conflict Free SP · Simulation Operations</p>
-  </div>
-</div>
+            <div>
+              <h1 style={titleStyle}>CFSP Ops Board</h1>
+              <p style={subtitleStyle}>
+                Conflict Free SP · Simulation Operations
+              </p>
+            </div>
+          </div>
 
-          <div style={headerActionsStyle}>
+          <div style={toolbarStyle}>
             <div style={fieldBlockStyle}>
               <label style={labelStyle}>View</label>
               <select
                 value={view}
                 onChange={(e) => setView(e.target.value as ViewFilter)}
-                style={inputStyle}
+                style={toolbarSelectStyle}
               >
                 <option value="all">All</option>
                 <option value="team">Team</option>
@@ -316,19 +341,23 @@ export default function Page() {
               </select>
             </div>
 
-            <Link href="/events/new" style={buttonLinkStyle}>
+            <Link href="/events/new" style={toolbarButtonLinkStyle}>
               + New Event
             </Link>
 
-            <Link href="/sps" style={buttonLinkStyle}>
+            <Link href="/sps" style={toolbarButtonLinkStyle}>
               SP Database
             </Link>
 
-            <button style={{ ...buttonStyle, opacity: 0.7, cursor: "default" }}>
-              Sign out
+            <button
+              style={toolbarButtonStyle}
+              onClick={handleSignOut}
+              disabled={signingOut}
+            >
+              {signingOut ? "Signing out..." : "Sign out"}
             </button>
           </div>
-        </div>
+        </section>
 
         <section style={statsGridStyle}>
           <div style={statCardStyle}>
@@ -365,6 +394,13 @@ export default function Page() {
         </section>
 
         <section style={panelStyle}>
+          <div style={panelHeaderStyle}>
+            <div style={panelTitleStyle}>
+              {editingId ? "Edit Event" : "Event Intake"}
+            </div>
+            {editingId && <div style={editBadgeStyle}>Editing</div>}
+          </div>
+
           <div style={gridStyle}>
             <div>
               <label style={labelStyle}>Name</label>
@@ -472,10 +508,8 @@ export default function Page() {
           <p style={infoTextStyle}>Loading events...</p>
         ) : filteredEvents.length === 0 ? (
           <section style={emptyStateStyle}>
-            <h2 style={{ marginTop: 0, marginBottom: 8, color: "#101828" }}>
-              No events to show
-            </h2>
-            <p style={{ margin: 0, color: "#667085" }}>
+            <h2 style={emptyTitleStyle}>No events to show</h2>
+            <p style={emptyTextStyle}>
               Add your first event above, or change the current view filter.
             </p>
           </section>
@@ -572,39 +606,57 @@ const pageStyle: React.CSSProperties = {
   minHeight: "100vh",
   background: "linear-gradient(180deg, #f8fafc 0%, #eef4fb 50%, #e9f0f8 100%)",
   color: "#101828",
-  padding: "32px 24px 48px",
+  padding: "24px 24px 40px",
   fontFamily:
     '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
 };
 
 const shellStyle: React.CSSProperties = {
-  maxWidth: 1280,
+  maxWidth: 1320,
   margin: "0 auto",
 };
 
-const headerStyle: React.CSSProperties = {
+const topBarStyle: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
-  alignItems: "flex-start",
-  gap: 16,
+  alignItems: "center",
+  gap: 20,
   marginBottom: 24,
   flexWrap: "wrap",
+  padding: "10px 4px 2px",
+};
+
+const brandWrapStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 18,
+  minWidth: 0,
+};
+
+const logoStyle: React.CSSProperties = {
+  height: 92,
+  width: "auto",
+  objectFit: "contain",
+  borderRadius: 12,
+  flexShrink: 0,
 };
 
 const titleStyle: React.CSSProperties = {
-  fontSize: 56,
-  fontWeight: 400,
+  fontSize: 46,
+  fontWeight: 700,
   margin: 0,
-  color: "#101828",
+  lineHeight: 1.05,
+  color: "#0f172a",
+  letterSpacing: "-0.02em",
 };
 
 const subtitleStyle: React.CSSProperties = {
-  marginTop: 8,
-  fontSize: 18,
+  margin: "8px 0 0 0",
+  fontSize: 16,
   color: "#475467",
 };
 
-const headerActionsStyle: React.CSSProperties = {
+const toolbarStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "flex-end",
   gap: 12,
@@ -615,6 +667,46 @@ const fieldBlockStyle: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 8,
+};
+
+const toolbarSelectStyle: React.CSSProperties = {
+  minWidth: 124,
+  height: 52,
+  padding: "0 14px",
+  borderRadius: 16,
+  border: "1px solid #d0d5dd",
+  background: "#ffffff",
+  color: "#101828",
+  fontSize: 16,
+  outline: "none",
+};
+
+const toolbarButtonStyle: React.CSSProperties = {
+  height: 52,
+  padding: "0 18px",
+  borderRadius: 16,
+  border: "1px solid #d0d5dd",
+  background: "#ffffff",
+  color: "#101828",
+  fontSize: 16,
+  cursor: "pointer",
+  boxShadow: "0 1px 2px rgba(16, 24, 40, 0.04)",
+};
+
+const toolbarButtonLinkStyle: React.CSSProperties = {
+  height: 52,
+  padding: "0 18px",
+  borderRadius: 16,
+  border: "1px solid #d0d5dd",
+  background: "#ffffff",
+  color: "#101828",
+  fontSize: 16,
+  cursor: "pointer",
+  textDecoration: "none",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  boxShadow: "0 1px 2px rgba(16, 24, 40, 0.04)",
 };
 
 const statsGridStyle: React.CSSProperties = {
@@ -640,7 +732,7 @@ const statLabelStyle: React.CSSProperties = {
 
 const statValueStyle: React.CSSProperties = {
   fontSize: 30,
-  fontWeight: 600,
+  fontWeight: 700,
   color: "#101828",
 };
 
@@ -649,16 +741,33 @@ const panelStyle: React.CSSProperties = {
   borderRadius: 24,
   padding: 18,
   marginBottom: 22,
-  background: "rgba(255, 255, 255, 0.88)",
+  background: "rgba(255, 255, 255, 0.9)",
   boxShadow: "0 10px 30px rgba(16, 24, 40, 0.06)",
 };
 
-const emptyStateStyle: React.CSSProperties = {
-  border: "1px solid #d8e1ec",
-  borderRadius: 24,
-  padding: 24,
-  background: "rgba(255, 255, 255, 0.88)",
-  boxShadow: "0 10px 30px rgba(16, 24, 40, 0.06)",
+const panelHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  marginBottom: 16,
+  flexWrap: "wrap",
+};
+
+const panelTitleStyle: React.CSSProperties = {
+  fontSize: 18,
+  fontWeight: 700,
+  color: "#101828",
+};
+
+const editBadgeStyle: React.CSSProperties = {
+  padding: "6px 10px",
+  borderRadius: 999,
+  fontSize: 13,
+  fontWeight: 600,
+  color: "#175cd3",
+  background: "#eff8ff",
+  border: "1px solid #b2ddff",
 };
 
 const gridStyle: React.CSSProperties = {
@@ -695,56 +804,7 @@ const buttonStyle: React.CSSProperties = {
   color: "#101828",
   fontSize: 16,
   cursor: "pointer",
-  textDecoration: "none",
-};
-
-const buttonLinkStyle: React.CSSProperties = {
-  padding: "14px 18px",
-  borderRadius: 16,
-  border: "1px solid #d0d5dd",
-  background: "#ffffff",
-  color: "#101828",
-  fontSize: 16,
-  cursor: "pointer",
-  textDecoration: "none",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-};
-
-const miniLinkStyle: React.CSSProperties = {
-  height: 42,
-  padding: "0 14px",
-  borderRadius: 14,
-  border: "1px solid #d0d5dd",
-  background: "#ffffff",
-  color: "#101828",
-  cursor: "pointer",
-  fontSize: 15,
-  textDecoration: "none",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-};
-
-const iconButtonStyle: React.CSSProperties = {
-  width: 42,
-  height: 42,
-  borderRadius: 14,
-  border: "1px solid #d0d5dd",
-  background: "#ffffff",
-  color: "#101828",
-  cursor: "pointer",
-  fontSize: 18,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: 0,
-};
-
-const dangerIconButtonStyle: React.CSSProperties = {
-  ...iconButtonStyle,
-  color: "#b42318",
+  boxShadow: "0 1px 2px rgba(16, 24, 40, 0.04)",
 };
 
 const formActionsStyle: React.CSSProperties = {
@@ -762,6 +822,25 @@ const editingNoteStyle: React.CSSProperties = {
 
 const infoTextStyle: React.CSSProperties = {
   color: "#475467",
+};
+
+const emptyStateStyle: React.CSSProperties = {
+  border: "1px solid #d8e1ec",
+  borderRadius: 24,
+  padding: 24,
+  background: "rgba(255, 255, 255, 0.88)",
+  boxShadow: "0 10px 30px rgba(16, 24, 40, 0.06)",
+};
+
+const emptyTitleStyle: React.CSSProperties = {
+  marginTop: 0,
+  marginBottom: 8,
+  color: "#101828",
+};
+
+const emptyTextStyle: React.CSSProperties = {
+  margin: 0,
+  color: "#667085",
 };
 
 const cardsGridStyle: React.CSSProperties = {
@@ -800,6 +879,41 @@ const cardBodyStyle: React.CSSProperties = {
   lineHeight: 1.8,
   fontSize: 18,
   color: "#101828",
+};
+
+const miniLinkStyle: React.CSSProperties = {
+  height: 42,
+  padding: "0 14px",
+  borderRadius: 14,
+  border: "1px solid #d0d5dd",
+  background: "#ffffff",
+  color: "#101828",
+  cursor: "pointer",
+  fontSize: 15,
+  textDecoration: "none",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const iconButtonStyle: React.CSSProperties = {
+  width: 42,
+  height: 42,
+  borderRadius: 14,
+  border: "1px solid #d0d5dd",
+  background: "#ffffff",
+  color: "#101828",
+  cursor: "pointer",
+  fontSize: 18,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 0,
+};
+
+const dangerIconButtonStyle: React.CSSProperties = {
+  ...iconButtonStyle,
+  color: "#b42318",
 };
 
 const pillStyle: React.CSSProperties = {
