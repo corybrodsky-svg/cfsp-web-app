@@ -76,6 +76,41 @@ function compareEvents(a: EventRow, b: EventRow) {
   return dateB - dateA;
 }
 
+function getStatusPillStyle(status: string | null): React.CSSProperties {
+  switch ((status ?? "").toLowerCase()) {
+    case "needs sps":
+      return {
+        background: "#fef3f2",
+        color: "#b42318",
+        border: "1px solid #fda29b",
+      };
+    case "scheduled":
+      return {
+        background: "#fffaeb",
+        color: "#b54708",
+        border: "1px solid #f7b27a",
+      };
+    case "in progress":
+      return {
+        background: "#eff8ff",
+        color: "#175cd3",
+        border: "1px solid #84caff",
+      };
+    case "complete":
+      return {
+        background: "#ecfdf3",
+        color: "#027a48",
+        border: "1px solid #75e0a7",
+      };
+    default:
+      return {
+        background: "#f8fafc",
+        color: "#475467",
+        border: "1px solid #d0d5dd",
+      };
+  }
+}
+
 export default function Page() {
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -521,13 +556,24 @@ export default function Page() {
               return (
                 <article key={event.id} style={cardStyle}>
                   <div style={cardHeaderStyle}>
-                    <div>
+                    <div style={{ minWidth: 0 }}>
                       <h2 style={cardTitleStyle}>{event.name || "Untitled Event"}</h2>
 
-                      <div style={pillStyle}>
-                        {normalizedVisibility(event.visibility) === "personal"
-                          ? "Personal"
-                          : "Team"}
+                      <div style={cardMetaRowStyle}>
+                        <span style={pillStyle}>
+                          {normalizedVisibility(event.visibility) === "personal"
+                            ? "Personal"
+                            : "Team"}
+                        </span>
+
+                        <span
+                          style={{
+                            ...statusPillBaseStyle,
+                            ...getStatusPillStyle(event.status),
+                          }}
+                        >
+                          {event.status || "Unknown"}
+                        </span>
                       </div>
                     </div>
 
@@ -557,20 +603,21 @@ export default function Page() {
                   </div>
 
                   <div style={cardBodyStyle}>
-                    <div>
-                      <strong>Status:</strong> {event.status || "-"}
-                    </div>
+                    <div style={infoGridStyle}>
+                      <div style={infoCellStyle}>
+                        <div style={infoLabelStyle}>Date</div>
+                        <div style={infoValueStyle}>{event.date_text || "-"}</div>
+                      </div>
 
-                    <div>
-                      <strong>Date:</strong> {event.date_text || "-"}
+                      <div style={infoCellStyle}>
+                        <div style={infoLabelStyle}>SP Coverage</div>
+                        <div style={infoValueStyle}>
+                          {event.sp_assigned ?? 0} / {event.sp_needed ?? 0}
+                        </div>
+                      </div>
                     </div>
 
                     <div style={spRowStyle}>
-                      <div>
-                        <strong>SPs:</strong> {event.sp_assigned ?? 0} /{" "}
-                        {event.sp_needed ?? 0}
-                      </div>
-
                       <button
                         onClick={() => handleAdjustAssigned(event, -1)}
                         style={iconButtonStyle}
@@ -589,7 +636,11 @@ export default function Page() {
                         +
                       </button>
 
-                      {short > 0 && <span style={shortagePillStyle}>Short {short}</span>}
+                      {short > 0 ? (
+                        <span style={shortagePillStyle}>Short {short}</span>
+                      ) : (
+                        <span style={fullPillStyle}>Fully assigned</span>
+                      )}
                     </div>
                   </div>
                 </article>
@@ -814,15 +865,15 @@ const inputStyle: React.CSSProperties = {
 };
 
 const primaryButtonStyle: React.CSSProperties = {
-  padding: "14px 18px",
+  padding: "14px 20px",
   borderRadius: 16,
-  border: "1px solid #175cd3",
-  background: "#175cd3",
+  border: "none",
+  background: "linear-gradient(135deg, #175cd3, #1849a9)",
   color: "#ffffff",
   fontSize: 16,
   cursor: "pointer",
-  fontWeight: 600,
-  boxShadow: "0 2px 6px rgba(23, 92, 211, 0.25)",
+  fontWeight: 700,
+  boxShadow: "0 6px 16px rgba(23, 92, 211, 0.35)",
 };
 
 const secondaryButtonStyle: React.CSSProperties = {
@@ -894,8 +945,16 @@ const cardHeaderStyle: React.CSSProperties = {
 
 const cardTitleStyle: React.CSSProperties = {
   margin: 0,
-  fontSize: 22,
+  fontSize: 24,
   color: "#101828",
+  lineHeight: 1.2,
+};
+
+const cardMetaRowStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 8,
+  flexWrap: "wrap",
+  marginTop: 12,
 };
 
 const cardActionsStyle: React.CSSProperties = {
@@ -905,8 +964,34 @@ const cardActionsStyle: React.CSSProperties = {
 
 const cardBodyStyle: React.CSSProperties = {
   marginTop: 18,
-  lineHeight: 1.8,
+  color: "#101828",
+};
+
+const infoGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 12,
+};
+
+const infoCellStyle: React.CSSProperties = {
+  padding: "12px 14px",
+  borderRadius: 16,
+  background: "#f8fafc",
+  border: "1px solid #e4e7ec",
+};
+
+const infoLabelStyle: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: "0.03em",
+  color: "#667085",
+  marginBottom: 6,
+};
+
+const infoValueStyle: React.CSSProperties = {
   fontSize: 18,
+  fontWeight: 600,
   color: "#101828",
 };
 
@@ -947,7 +1032,6 @@ const dangerIconButtonStyle: React.CSSProperties = {
 
 const pillStyle: React.CSSProperties = {
   display: "inline-block",
-  marginTop: 12,
   padding: "6px 10px",
   borderRadius: 999,
   border: "1px solid #d0d5dd",
@@ -956,11 +1040,19 @@ const pillStyle: React.CSSProperties = {
   background: "#f8fafc",
 };
 
+const statusPillBaseStyle: React.CSSProperties = {
+  display: "inline-block",
+  padding: "6px 10px",
+  borderRadius: 999,
+  fontSize: 14,
+  fontWeight: 600,
+};
+
 const spRowStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 10,
-  marginTop: 8,
+  marginTop: 16,
   flexWrap: "wrap",
 };
 
@@ -972,4 +1064,14 @@ const shortagePillStyle: React.CSSProperties = {
   fontWeight: 600,
   fontSize: 14,
   border: "1px solid #fda4af",
+};
+
+const fullPillStyle: React.CSSProperties = {
+  padding: "6px 12px",
+  borderRadius: 999,
+  background: "#ecfdf3",
+  color: "#027a48",
+  fontWeight: 600,
+  fontSize: 14,
+  border: "1px solid #75e0a7",
 };
