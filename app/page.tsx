@@ -1,9 +1,24 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { supabase } from "./lib/supabaseClient";
-
+<Link
+  href="/events/new"
+  style={{
+    display: "inline-block",
+    padding: "10px 14px",
+    border: "1px solid #ccc",
+    borderRadius: "8px",
+    textDecoration: "none",
+    color: "#111",
+    marginBottom: "16px",
+  }}
+>
+  + New Event
+</Link>
 type Visibility = "team" | "personal";
+type ViewFilter = "all" | Visibility;
 
 type EventRow = {
   id: string;
@@ -12,574 +27,700 @@ type EventRow = {
   date_text: string | null;
   sp_needed: number | null;
   sp_assigned: number | null;
-  owner_id: string | null;
-  visibility: Visibility;
-  created_at?: string;
+  visibility: string | null;
+  created_at: string | null;
 };
 
-const STATUSES = ["Needs SPs", "Scheduled", "In Progress", "Completed", "Canceled"];
+const STATUSES = ["Needs SPs", "Scheduled", "In Progress", "Complete"];
 const VISIBILITIES: Visibility[] = ["team", "personal"];
 
-function numOrNull(v: string) {
-  const t = v.trim();
-  if (!t) return null;
-  const n = Number(t);
-  return Number.isFinite(n) ? n : null;
+function parseNumber(value: string) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.floor(n));
 }
 
-function shortage(e: EventRow) {
-  const needed = e.sp_needed ?? 0;
-  const assigned = e.sp_assigned ?? 0;
+function shortage(event: EventRow) {
+  const needed = event.sp_needed ?? 0;
+  const assigned = event.sp_assigned ?? 0;
   return Math.max(needed - assigned, 0);
 }
 
-function labelVisibility(v: Visibility) {
-  return v === "team" ? "Team" : "Personal";
+function normalizedVisibility(value: string | null): Visibility {
+  return value?.toLowerCase() === "personal" ? "personal" : "team";
 }
 
-export default function Home() {
-  const [loading, setLoading] = useState(true);
-  const [sessionOk, setSessionOk] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
+function normalizeText(value: string | null | undefined) {
+  return (value ?? "").trim().toLowerCase();
+}
 
+function duplicateKey(event: EventRow) {
+  return [
+    normalizeText(event.name),
+    normalizeText(event.date_text),
+    normalizedVisibility(event.visibility),
+  ].join("|");
+}
+
+function statusRank(status: string | null) {
+  switch ((status ?? "").toLowerCase()) {
+    case "needs sps":
+      return 0;
+    case "scheduled":
+      return 1;
+    case "in progress":
+      return 2;
+    case "complete":
+      return 3;
+    default:
+      return 4;
+  }
+}
+
+function compareEvents(a: EventRow, b: EventRow) {
+  const shortDiff = shortage(b) - shortage(a);
+  if (shortDiff !== 0) return shortDiff;
+
+  const statusDiff = statusRank(a.status) - statusRank(b.status);
+  if (statusDiff !== 0) return statusDiff;
+
+  const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+  const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+  return dateB - dateA;
+}
+
+export default function Page() {
   const [events, setEvents] = useState<EventRow[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // View filter
-  const [view, setView] = useState<"all" | Visibility>("all");
-
-  // Form state
-  const [name, setName] = useState("N651 Virtual");
+  const [name, setName] = useState("");
   const [status, setStatus] = useState("Needs SPs");
-  const [dateText, setDateText] = useState("3/10, 3/11");
-  const [spNeeded, setSpNeeded] = useState("6");
-  const [spAssigned, setSpAssigned] = useState("2");
+  const [dateText, setDateText] = useState("");
+  const [spNeeded, setSpNeeded] = useState("");
+  const [spAssigned, setSpAssigned] = useState("");
   const [visibility, setVisibility] = useState<Visibility>("team");
 
-  // Edit modal
-  const [editing, setEditing] = useState<EventRow | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editStatus, setEditStatus] = useState("");
-  const [editDateText, setEditDateText] = useState("");
-  const [editSpNeeded, setEditSpNeeded] = useState("");
-  const [editSpAssigned, setEditSpAssigned] = useState("");
-  const [editVisibility, setEditVisibility] = useState<Visibility>("team");
+  const [view, setView] = useState<ViewFilter>("all");
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   async function loadEvents() {
-    setError(null);
+    setLoading(true);
 
     const { data, error } = await supabase
       .from("events")
-      .select("id,name,status,date_text,sp_needed,sp_assigned,owner_id,visibility,created_at")
+      .select("id, name, status, date_text, sp_needed, sp_assigned, visibility, created_at")
       .order("created_at", { ascending: false });
 
     if (error) {
-      setError(error.message);
-      setEvents([]);
+      console.error("Error loading events:", error);
+      alert("Could not load events.");
+      setLoading(false);
       return;
     }
 
-    // Make sure visibility is always typed correctly even if null/old rows exist
-    const normalized = ((data as any[]) ?? []).map((r) => ({
-      ...r,
-      visibility: (r.visibility === "personal" ? "personal" : "team") as Visibility,
-    })) as EventRow[];
-
-    setEvents(normalized);
+    setEvents((data ?? []) as EventRow[]);
+    setLoading(false);
   }
 
   useEffect(() => {
-    (async () => {
-      // Auth gate
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        window.location.href = "/login";
-        return;
-      }
-      setSessionOk(true);
-
-      const uid = data.session.user.id;
-      setUserId(uid);
-
-      await loadEvents();
-
-      // Realtime updates
-      const channel = supabase
-        .channel("events-realtime")
-        .on("postgres_changes", { event: "*", schema: "public", table: "events" }, () => {
-          loadEvents();
-        })
-        .subscribe();
-
-      setLoading(false);
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadEvents();
   }, []);
 
-  const filtered = useMemo(() => {
-    if (view === "all") return events;
-    return events.filter((e) => e.visibility === view);
-  }, [events, view]);
-
-  const sorted = useMemo(() => {
-    const copy = [...filtered];
-    copy.sort((a, b) => {
-      const sa = shortage(a);
-      const sb = shortage(b);
-      if (sb !== sa) return sb - sa; // most shortage first
-      const an = (a.name ?? "").toLowerCase();
-      const bn = (b.name ?? "").toLowerCase();
-      return an.localeCompare(bn);
-    });
-    return copy;
-  }, [filtered]);
-
-  async function addEvent() {
-    setError(null);
-
-    if (!userId) {
-      setError("Not signed in.");
-      return;
-    }
-
-    const payload = {
-      name: name.trim() || null,
-      status: status.trim() || null,
-      date_text: dateText.trim() || null,
-      sp_needed: numOrNull(spNeeded),
-      sp_assigned: numOrNull(spAssigned),
-      owner_id: userId,
-      visibility,
-    };
-
-    const { error } = await supabase.from("events").insert(payload);
-    if (error) {
-      setError(error.message);
-      return;
-    }
-
+  function clearForm() {
     setName("");
+    setStatus("Needs SPs");
     setDateText("");
     setSpNeeded("");
     setSpAssigned("");
     setVisibility("team");
-    await loadEvents();
+    setEditingId(null);
   }
 
-  function openEdit(e: EventRow) {
-    setEditing(e);
-    setEditName(e.name ?? "");
-    setEditStatus(e.status ?? "Needs SPs");
-    setEditDateText(e.date_text ?? "");
-    setEditSpNeeded(String(e.sp_needed ?? ""));
-    setEditSpAssigned(String(e.sp_assigned ?? ""));
-    setEditVisibility(e.visibility ?? "team");
-  }
+  async function handleSaveEvent() {
+    if (saving) return;
 
-  async function saveEdit() {
-    if (!editing) return;
-    setError(null);
+    const cleanName = name.trim();
+    const cleanDateText = dateText.trim();
+    const needed = parseNumber(spNeeded);
+    const assigned = parseNumber(spAssigned);
 
-    // Preserve owner_id so nobody accidentally blanks/changes it
-    const updates = {
-      name: editName.trim() || null,
-      status: editStatus.trim() || null,
-      date_text: editDateText.trim() || null,
-      sp_needed: numOrNull(editSpNeeded),
-      sp_assigned: numOrNull(editSpAssigned),
-      visibility: editVisibility,
-      owner_id: editing.owner_id, // keep original
+    if (!cleanName) {
+      alert("Please enter an event name.");
+      return;
+    }
+
+    if (assigned > needed) {
+      alert("SP Assigned cannot be greater than SP Needed.");
+      return;
+    }
+
+    const payload = {
+      name: cleanName,
+      status,
+      date_text: cleanDateText,
+      sp_needed: needed,
+      sp_assigned: assigned,
+      visibility,
     };
 
-    const { error } = await supabase.from("events").update(updates).eq("id", editing.id);
-    if (error) setError(error.message);
+    setSaving(true);
 
-    setEditing(null);
+    if (editingId) {
+      const { error } = await supabase
+        .from("events")
+        .update(payload)
+        .eq("id", editingId);
+
+      if (error) {
+        console.error("Error updating event:", error);
+        alert("Could not update event: " + error.message);
+        setSaving(false);
+        return;
+      }
+    } else {
+      const { error } = await supabase.from("events").insert([payload]);
+
+      if (error) {
+        console.error("Error creating event:", error);
+        alert("Could not save event.");
+        setSaving(false);
+        return;
+      }
+    }
+
+    clearForm();
+    await loadEvents();
+    setSaving(false);
+  }
+
+  async function handleAdjustAssigned(event: EventRow, change: number) {
+    const currentAssigned = event.sp_assigned ?? 0;
+    const needed = event.sp_needed ?? 0;
+    const nextAssigned = currentAssigned + change;
+
+    if (nextAssigned < 0) return;
+    if (nextAssigned > needed) return;
+
+    const { error } = await supabase
+      .from("events")
+      .update({
+        sp_assigned: nextAssigned,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", event.id);
+
+    if (error) {
+      console.error("Adjust assigned error:", error);
+      alert("Could not update SP Assigned: " + error.message);
+      return;
+    }
+
     await loadEvents();
   }
 
-  async function deleteEvent(id: string) {
-    if (!confirm("Delete this event?")) return;
-    setError(null);
+  function handleEdit(event: EventRow) {
+    setEditingId(event.id);
+    setName(event.name ?? "");
+    setStatus(event.status ?? "Needs SPs");
+    setDateText(event.date_text ?? "");
+    setSpNeeded(String(event.sp_needed ?? 0));
+    setSpAssigned(String(event.sp_assigned ?? 0));
+    setVisibility(normalizedVisibility(event.visibility));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function handleDelete(id: string) {
+    if (deletingId) return;
+
+    const ok = window.confirm("Delete this event?");
+    if (!ok) return;
+
+    setDeletingId(id);
 
     const { error } = await supabase.from("events").delete().eq("id", id);
-    if (error) setError(error.message);
 
+    if (error) {
+      console.error("Error deleting event:", error);
+      alert("Could not delete event.");
+      setDeletingId(null);
+      return;
+    }
+
+    if (editingId === id) clearForm();
     await loadEvents();
+    setDeletingId(null);
   }
 
-  async function signOut() {
-    await supabase.auth.signOut();
-    window.location.href = "/login";
-  }
+  const filteredEvents = useMemo(() => {
+    const visible =
+      view === "all"
+        ? events
+        : events.filter((e) => normalizedVisibility(e.visibility) === view);
 
-  function canEdit(e: EventRow) {
-    // UX hint only — real enforcement is RLS
-    return e.visibility === "team" || (!!userId && e.owner_id === userId);
-  }
+    const seen = new Set<string>();
+    const deduped: EventRow[] = [];
 
-  if (loading) {
-    return (
-      <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#0b0b0b", color: "white" }}>
-        Loading...
-      </main>
-    );
-  }
+    for (const event of visible) {
+      const key = duplicateKey(event);
+      if (!key || key === "||team") {
+        deduped.push(event);
+        continue;
+      }
 
-  if (!sessionOk) return null;
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduped.push(event);
+      }
+    }
+
+    return [...deduped].sort(compareEvents);
+  }, [events, view]);
+
+  const stats = useMemo(() => {
+    const total = filteredEvents.length;
+    const needsSps = filteredEvents.filter(
+      (e) => (e.status ?? "").toLowerCase() === "needs sps"
+    ).length;
+    const totalNeeded = filteredEvents.reduce((sum, e) => sum + (e.sp_needed ?? 0), 0);
+    const totalAssigned = filteredEvents.reduce((sum, e) => sum + (e.sp_assigned ?? 0), 0);
+    const totalShort = filteredEvents.reduce((sum, e) => sum + shortage(e), 0);
+
+    return { total, needsSps, totalNeeded, totalAssigned, totalShort };
+  }, [filteredEvents]);
 
   return (
-    <main style={{ background: "#0b0b0b", color: "white", minHeight: "100vh", padding: 24, fontFamily: "system-ui" }}>
-      <header style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <div>
-          <h1 style={{ fontSize: 36, margin: 0 }}>CFSP Ops Board</h1>
-          <div style={{ opacity: 0.75, marginTop: 4 }}>Conflict Free SP · Simulation Operations</div>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          {/* View filter */}
-          <div style={{ minWidth: 220 }}>
-            <SelectField
-              label="View"
-              value={view}
-              onChange={(v) => setView(v as any)}
-              options={["all", "team", "personal"]}
-              optionLabel={(o) => (o === "all" ? "All" : o === "team" ? "Team" : "Personal")}
-            />
+    <main
+      style={{
+        minHeight: "100vh",
+        background: "#000",
+        color: "#fff",
+        padding: "32px 24px 48px",
+        fontFamily: "Arial, sans-serif",
+      }}
+    >
+      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: 16,
+            marginBottom: 24,
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <h1 style={{ fontSize: 56, fontWeight: 400, margin: 0 }}>CFSP Ops Board</h1>
+            <p style={{ marginTop: 8, fontSize: 18, color: "#cfcfcf" }}>
+              Conflict Free SP · Simulation Operations
+            </p>
           </div>
 
-          <button
-            onClick={signOut}
+          <div style={{ display: "flex", alignItems: "end", gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <label style={labelStyle}>View</label>
+              <select
+                value={view}
+                onChange={(e) => setView(e.target.value as ViewFilter)}
+                style={inputStyle}
+              >
+                <option value="all">All</option>
+                <option value="team">Team</option>
+                <option value="personal">Personal</option>
+              </select>
+            </div>
+
+            <Link href="/sps" style={buttonLinkStyle}>
+              SP Database
+            </Link>
+
+            <button style={{ ...buttonStyle, opacity: 0.6, cursor: "default" }}>
+              Sign out
+            </button>
+          </div>
+        </div>
+
+        <section
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gap: 12,
+            marginBottom: 22,
+          }}
+        >
+          <div style={statCardStyle}>
+            <div style={statLabelStyle}>Visible Events</div>
+            <div style={statValueStyle}>{stats.total}</div>
+          </div>
+
+          <div style={statCardStyle}>
+            <div style={statLabelStyle}>Needs SPs</div>
+            <div style={statValueStyle}>{stats.needsSps}</div>
+          </div>
+
+          <div style={statCardStyle}>
+            <div style={statLabelStyle}>SP Needed</div>
+            <div style={statValueStyle}>{stats.totalNeeded}</div>
+          </div>
+
+          <div style={statCardStyle}>
+            <div style={statLabelStyle}>SP Assigned</div>
+            <div style={statValueStyle}>{stats.totalAssigned}</div>
+          </div>
+
+          <div style={statCardStyle}>
+            <div style={statLabelStyle}>Total Short</div>
+            <div style={{ ...statValueStyle, color: stats.totalShort > 0 ? "#ffb3b3" : "#fff" }}>
+              {stats.totalShort}
+            </div>
+          </div>
+        </section>
+
+        <section style={panelStyle}>
+          <div style={gridStyle}>
+            <div>
+              <label style={labelStyle}>Name</label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                style={inputStyle}
+                placeholder="N651 Virtual"
+              />
+            </div>
+
+            <div>
+              <label style={labelStyle}>Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                style={inputStyle}
+              >
+                {STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label style={labelStyle}>Date (text)</label>
+              <input
+                value={dateText}
+                onChange={(e) => setDateText(e.target.value)}
+                style={inputStyle}
+                placeholder="3/10, 3/11"
+              />
+            </div>
+
+            <div>
+              <label style={labelStyle}>SP Needed</label>
+              <input
+                value={spNeeded}
+                onChange={(e) => setSpNeeded(e.target.value)}
+                style={inputStyle}
+                placeholder="6"
+                type="number"
+                min="0"
+              />
+            </div>
+
+            <div>
+              <label style={labelStyle}>SP Assigned</label>
+              <input
+                value={spAssigned}
+                onChange={(e) => setSpAssigned(e.target.value)}
+                style={inputStyle}
+                placeholder="2"
+                type="number"
+                min="0"
+              />
+            </div>
+
+            <div>
+              <label style={labelStyle}>Visibility</label>
+              <select
+                value={visibility}
+                onChange={(e) => setVisibility(e.target.value as Visibility)}
+                style={inputStyle}
+              >
+                {VISIBILITIES.map((v) => (
+                  <option key={v} value={v}>
+                    {v.charAt(0).toUpperCase() + v.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 12, marginTop: 18, flexWrap: "wrap" }}>
+            <button onClick={handleSaveEvent} style={buttonStyle} disabled={saving}>
+              {saving
+                ? editingId
+                  ? "Updating..."
+                  : "Saving..."
+                : editingId
+                  ? "Update Event"
+                  : "Add Event"}
+            </button>
+
+            <button onClick={loadEvents} style={buttonStyle} disabled={loading || saving}>
+              {loading ? "Refreshing..." : "Refresh"}
+            </button>
+
+            <button onClick={clearForm} style={buttonStyle} disabled={saving}>
+              {editingId ? "Cancel Edit" : "Clear"}
+            </button>
+          </div>
+
+          {editingId && (
+            <p style={{ marginTop: 14, color: "#cfcfcf", fontSize: 14 }}>
+              Editing existing event. Click “Cancel Edit” to stop.
+            </p>
+          )}
+        </section>
+
+        {loading ? (
+          <p style={{ color: "#cfcfcf" }}>Loading events...</p>
+        ) : filteredEvents.length === 0 ? (
+          <section style={emptyStateStyle}>
+            <h2 style={{ marginTop: 0, marginBottom: 8 }}>No events to show</h2>
+            <p style={{ margin: 0, color: "#cfcfcf" }}>
+              Add your first event above, or change the current view filter.
+            </p>
+          </section>
+        ) : (
+          <section
             style={{
-              height: 38,
-              padding: "0 12px",
-              borderRadius: 10,
-              border: "1px solid rgba(255,255,255,0.12)",
-              background: "rgba(255,255,255,0.06)",
-              color: "white",
-              cursor: "pointer",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))",
+              gap: 16,
             }}
           >
-            Sign out
-          </button>
-        </div>
-      </header>
-
-      {error && (
-        <div style={{ marginTop: 14, padding: 12, borderRadius: 12, border: "1px solid rgba(255, 120, 120, 0.35)", background: "rgba(255, 60, 60, 0.12)" }}>
-          <b>Supabase error:</b> {error}
-        </div>
-      )}
-
-      {/* Form */}
-      <section
-        style={{
-          marginTop: 18,
-          border: "1px solid rgba(255,255,255,0.12)",
-          background: "rgba(255,255,255,0.03)",
-          borderRadius: 16,
-          padding: 14,
-        }}
-      >
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1.2fr 0.8fr", gap: 10 }}>
-          <Field label="Name" value={name} onChange={setName} placeholder="N651 Virtual" />
-          <SelectField label="Status" value={status} onChange={setStatus} options={STATUSES} />
-          <Field label="Date (text)" value={dateText} onChange={setDateText} placeholder="3/10, 3/11" />
-          <Field label="SP Needed" value={spNeeded} onChange={setSpNeeded} placeholder="6" inputMode="numeric" />
-        </div>
-
-        <div style={{ marginTop: 10, display: "flex", alignItems: "end", gap: 10, flexWrap: "wrap" }}>
-          <div style={{ width: 220 }}>
-            <Field label="SP Assigned" value={spAssigned} onChange={setSpAssigned} placeholder="2" inputMode="numeric" />
-          </div>
-
-          <div style={{ width: 220 }}>
-            <SelectField
-              label="Visibility"
-              value={visibility}
-              onChange={(v) => setVisibility(v as Visibility)}
-              options={VISIBILITIES}
-              optionLabel={(o) => labelVisibility(o as Visibility)}
-            />
-          </div>
-
-          <button onClick={addEvent} style={btnStyle()}>
-            Add / Save Event
-          </button>
-
-          <button onClick={loadEvents} style={btnStyle(true)}>
-            Refresh
-          </button>
-        </div>
-      </section>
-
-      {/* List */}
-      <section style={{ marginTop: 18 }}>
-        {sorted.length === 0 ? (
-          <div style={{ opacity: 0.7 }}>No events yet. Add one above.</div>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12 }}>
-            {sorted.map((e) => {
-              const need = e.sp_needed ?? 0;
-              const assigned = e.sp_assigned ?? 0;
-              const short = shortage(e);
-              const editable = canEdit(e);
+            {filteredEvents.map((event) => {
+              const short = shortage(event);
+              const isDeleting = deletingId === event.id;
 
               return (
-                <div
-                  key={e.id}
-                  style={{
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    background: "rgba(255,255,255,0.03)",
-                    borderRadius: 16,
-                    padding: 14,
-                    opacity: editable ? 1 : 0.92,
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                    <div style={{ display: "grid", gap: 6 }}>
-                      <div style={{ fontSize: 18, fontWeight: 700 }}>{e.name ?? "(untitled)"}</div>
+                <article key={event.id} style={cardStyle}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                    <div>
+                      <h2 style={{ margin: 0, fontSize: 22 }}>
+                        {event.name || "Untitled Event"}
+                      </h2>
 
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <span
-                          style={{
-                            padding: "2px 8px",
-                            borderRadius: 999,
-                            border: "1px solid rgba(255,255,255,0.14)",
-                            background: "rgba(255,255,255,0.06)",
-                            fontSize: 12,
-                            opacity: 0.9,
-                          }}
-                        >
-                          {labelVisibility(e.visibility)}
-                        </span>
-
-                        {e.visibility === "personal" && userId && e.owner_id === userId && (
-                          <span
-                            style={{
-                              padding: "2px 8px",
-                              borderRadius: 999,
-                              border: "1px solid rgba(120,180,255,0.25)",
-                              background: "rgba(80,140,255,0.12)",
-                              fontSize: 12,
-                              opacity: 0.95,
-                            }}
-                          >
-                            Mine
-                          </span>
-                        )}
+                      <div style={pillStyle}>
+                        {normalizedVisibility(event.visibility) === "personal" ? "Personal" : "Team"}
                       </div>
                     </div>
 
                     <div style={{ display: "flex", gap: 8 }}>
+                      <Link href={`/events/${event.id}`} style={miniLinkStyle}>
+                        Details
+                      </Link>
+
                       <button
-                        onClick={() => openEdit(e)}
-                        title={editable ? "Edit" : "Edit (not allowed)"}
-                        style={iconBtn(!editable)}
-                        disabled={!editable}
+                        onClick={() => handleEdit(event)}
+                        style={iconButtonStyle}
+                        title="Edit"
+                        disabled={saving || !!deletingId}
                       >
                         ✎
                       </button>
+
                       <button
-                        onClick={() => deleteEvent(e.id)}
-                        title={editable ? "Delete" : "Delete (not allowed)"}
-                        style={iconBtn(!editable)}
-                        disabled={!editable}
+                        onClick={() => handleDelete(event.id)}
+                        style={iconButtonStyle}
+                        title="Delete"
+                        disabled={saving || !!deletingId}
                       >
                         🗑
                       </button>
                     </div>
                   </div>
 
-                  <div style={{ marginTop: 10, display: "grid", gap: 6, opacity: 0.9 }}>
+                  <div style={{ marginTop: 18, lineHeight: 1.8, fontSize: 18 }}>
                     <div>
-                      <b>Status:</b> {e.status ?? "-"}
-                    </div>
-                    <div>
-                      <b>Date:</b> {e.date_text ?? "-"}
-                    </div>
-                    <div>
-                      <b>SPs:</b> {assigned} / {need}
-                      {short > 0 && (
-                        <span style={{ marginLeft: 10, padding: "2px 8px", borderRadius: 999, border: "1px solid rgba(255,120,120,0.35)", background: "rgba(255,60,60,0.12)" }}>
-                          Short {short}
-                        </span>
-                      )}
-                      {short === 0 && need > 0 && (
-                        <span style={{ marginLeft: 10, padding: "2px 8px", borderRadius: 999, border: "1px solid rgba(120,255,170,0.25)", background: "rgba(60,255,140,0.10)" }}>
-                          Covered
-                        </span>
-                      )}
+                      <strong>Status:</strong> {event.status || "-"}
                     </div>
 
-                    {!editable && (
-                      <div style={{ marginTop: 6, opacity: 0.7, fontSize: 12 }}>
-                        You can view this event, but you don’t have permission to edit/delete it.
+                    <div>
+                      <strong>Date:</strong> {event.date_text || "-"}
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+                      <div>
+                        <strong>SPs:</strong> {event.sp_assigned ?? 0} / {event.sp_needed ?? 0}
                       </div>
-                    )}
+
+                      <button
+                        onClick={() => handleAdjustAssigned(event, -1)}
+                        style={iconButtonStyle}
+                        title="Remove one SP"
+                        disabled={(event.sp_assigned ?? 0) <= 0}
+                      >
+                        -
+                      </button>
+
+                      <button
+                        onClick={() => handleAdjustAssigned(event, 1)}
+                        style={iconButtonStyle}
+                        title="Add one SP"
+                        disabled={(event.sp_assigned ?? 0) >= (event.sp_needed ?? 0)}
+                      >
+                        +
+                      </button>
+
+                      {short > 0 && (
+                        <span style={shortagePillStyle}>Short {short}</span>
+                      )}
+                    </div>
                   </div>
-                </div>
+                </article>
               );
             })}
-          </div>
+          </section>
         )}
-      </section>
-
-      {/* Edit Modal */}
-      {editing && (
-        <div
-          onClick={() => setEditing(null)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.65)",
-            display: "grid",
-            placeItems: "center",
-            padding: 20,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "min(720px, 96vw)",
-              borderRadius: 16,
-              border: "1px solid rgba(255,255,255,0.12)",
-              background: "#0f0f0f",
-              padding: 14,
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-              <div style={{ fontSize: 18, fontWeight: 700 }}>Edit Event</div>
-              <button onClick={() => setEditing(null)} style={iconBtn()}>
-                ✕
-              </button>
-            </div>
-
-            <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "2fr 1.2fr 1.2fr 0.8fr", gap: 10 }}>
-              <Field label="Name" value={editName} onChange={setEditName} placeholder="Event name" />
-              <SelectField label="Status" value={editStatus} onChange={setEditStatus} options={STATUSES} />
-              <Field label="Date (text)" value={editDateText} onChange={setEditDateText} placeholder="3/10, 3/11" />
-              <Field label="SP Needed" value={editSpNeeded} onChange={setEditSpNeeded} placeholder="6" inputMode="numeric" />
-            </div>
-
-            <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "end", flexWrap: "wrap" }}>
-              <div style={{ width: 220 }}>
-                <Field label="SP Assigned" value={editSpAssigned} onChange={setEditSpAssigned} placeholder="2" inputMode="numeric" />
-              </div>
-
-              <div style={{ width: 220 }}>
-                <SelectField
-                  label="Visibility"
-                  value={editVisibility}
-                  onChange={(v) => setEditVisibility(v as Visibility)}
-                  options={VISIBILITIES}
-                  optionLabel={(o) => labelVisibility(o as Visibility)}
-                />
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: 10, marginTop: 14, justifyContent: "flex-end" }}>
-              <button onClick={() => setEditing(null)} style={btnStyle(true)}>
-                Cancel
-              </button>
-              <button onClick={saveEdit} style={btnStyle()}>
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
     </main>
   );
 }
 
-function Field(props: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
-}) {
-  return (
-    <label style={{ display: "grid", gap: 6 }}>
-      <span style={{ opacity: 0.75, fontSize: 12 }}>{props.label}</span>
-      <input
-        value={props.value}
-        onChange={(e) => props.onChange(e.target.value)}
-        placeholder={props.placeholder}
-        inputMode={props.inputMode}
-        style={{
-          height: 42,
-          borderRadius: 12,
-          border: "1px solid rgba(255,255,255,0.12)",
-          background: "#0f0f0f",
-          color: "white",
-          padding: "0 12px",
-          outline: "none",
-        }}
-      />
-    </label>
-  );
-}
+const panelStyle: React.CSSProperties = {
+  border: "1px solid #2e2e2e",
+  borderRadius: 24,
+  padding: 18,
+  marginBottom: 22,
+  background: "#0b0b0b",
+};
 
-function SelectField(props: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: string[];
-  optionLabel?: (o: string) => string;
-}) {
-  return (
-    <label style={{ display: "grid", gap: 6 }}>
-      <span style={{ opacity: 0.75, fontSize: 12 }}>{props.label}</span>
-      <select
-        value={props.value}
-        onChange={(e) => props.onChange(e.target.value)}
-        style={{
-          height: 42,
-          borderRadius: 12,
-          border: "1px solid rgba(255,255,255,0.12)",
-          background: "#0f0f0f",
-          color: "white",
-          padding: "0 10px",
-          outline: "none",
-        }}
-      >
-        {props.options.map((o) => (
-          <option key={o} value={o}>
-            {props.optionLabel ? props.optionLabel(o) : o}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
+const cardStyle: React.CSSProperties = {
+  border: "1px solid #2e2e2e",
+  borderRadius: 24,
+  padding: 18,
+  background: "#0f0f0f",
+};
 
-function btnStyle(secondary?: boolean): React.CSSProperties {
-  return {
-    height: 42,
-    padding: "0 14px",
-    borderRadius: 12,
-    border: "1px solid rgba(255,255,255,0.12)",
-    background: secondary ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.10)",
-    color: "white",
-    cursor: "pointer",
-  };
-}
+const statCardStyle: React.CSSProperties = {
+  border: "1px solid #2e2e2e",
+  borderRadius: 20,
+  padding: "16px 18px",
+  background: "#0d0d0d",
+};
 
-function iconBtn(disabled?: boolean): React.CSSProperties {
-  return {
-    height: 32,
-    width: 32,
-    borderRadius: 10,
-    border: "1px solid rgba(255,255,255,0.12)",
-    background: disabled ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.06)",
-    color: "white",
-    cursor: disabled ? "not-allowed" : "pointer",
-    opacity: disabled ? 0.5 : 1,
-  };
-}
+const statLabelStyle: React.CSSProperties = {
+  color: "#cfcfcf",
+  fontSize: 13,
+  marginBottom: 8,
+};
+
+const statValueStyle: React.CSSProperties = {
+  fontSize: 30,
+  fontWeight: 600,
+};
+
+const emptyStateStyle: React.CSSProperties = {
+  border: "1px solid #2e2e2e",
+  borderRadius: 24,
+  padding: 24,
+  background: "#0b0b0b",
+};
+
+const gridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: 14,
+};
+
+const labelStyle: React.CSSProperties = {
+  display: "block",
+  marginBottom: 8,
+  color: "#cfcfcf",
+  fontSize: 14,
+};
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "14px 16px",
+  borderRadius: 16,
+  border: "1px solid #333",
+  background: "#050505",
+  color: "#fff",
+  fontSize: 16,
+  outline: "none",
+};
+
+const buttonStyle: React.CSSProperties = {
+  padding: "14px 18px",
+  borderRadius: 16,
+  border: "1px solid #3a3a3a",
+  background: "#1a1a1a",
+  color: "#fff",
+  fontSize: 16,
+  cursor: "pointer",
+};
+
+const buttonLinkStyle: React.CSSProperties = {
+  padding: "14px 18px",
+  borderRadius: 16,
+  border: "1px solid #3a3a3a",
+  background: "#1a1a1a",
+  color: "#fff",
+  fontSize: 16,
+  cursor: "pointer",
+  textDecoration: "none",
+  display: "inline-block",
+};
+
+const miniLinkStyle: React.CSSProperties = {
+  height: 42,
+  padding: "0 14px",
+  borderRadius: 14,
+  border: "1px solid #3a3a3a",
+  background: "#1a1a1a",
+  color: "#fff",
+  cursor: "pointer",
+  fontSize: 15,
+  textDecoration: "none",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const iconButtonStyle: React.CSSProperties = {
+  width: 42,
+  height: 42,
+  borderRadius: 14,
+  border: "1px solid #3a3a3a",
+  background: "#1a1a1a",
+  color: "#fff",
+  cursor: "pointer",
+  fontSize: 18,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 0,
+};
+
+const pillStyle: React.CSSProperties = {
+  display: "inline-block",
+  marginTop: 12,
+  padding: "6px 10px",
+  borderRadius: 999,
+  border: "1px solid #474747",
+  color: "#d7d7d7",
+  fontSize: 14,
+};
+
+const shortagePillStyle: React.CSSProperties = {
+  display: "inline-block",
+  marginLeft: 12,
+  padding: "4px 10px",
+  borderRadius: 999,
+  border: "1px solid #7a3a3a",
+  color: "#ffb3b3",
+  background: "rgba(140, 40, 40, 0.18)",
+  fontSize: 14,
+};
