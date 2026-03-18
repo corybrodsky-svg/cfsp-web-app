@@ -16,7 +16,6 @@ type EventDetailRow = {
   sp_assigned: number | null;
   visibility: string | null;
   created_at: string | null;
-
   location: string | null;
   zoom_link: string | null;
   training_info: string | null;
@@ -24,8 +23,48 @@ type EventDetailRow = {
   notes: string | null;
 };
 
+type SPRow = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  phone: string | null;
+  status: string | null;
+  notes: string | null;
+  age_range: string | null;
+  gender: string | null;
+  ethnicity: string | null;
+  skills: string | null;
+  availability: string | null;
+  actor_notes: string | null;
+  created_at: string | null;
+};
+
+type EventSPRow = {
+  id: string;
+  event_id: string;
+  sp_id: string;
+  role_name: string | null;
+  assignment_status: string | null;
+  notes: string | null;
+  created_at: string | null;
+};
+
+type AvailabilityRow = {
+  id: string;
+  sp_id: string;
+  day_of_week: number;
+  start_time: string | null;
+  end_time: string | null;
+  availability_type: string | null;
+  notes: string | null;
+  created_at: string | null;
+};
+
 const STATUSES = ["Needs SPs", "Scheduled", "In Progress", "Complete"];
 const VISIBILITIES: Visibility[] = ["team", "personal"];
+const ASSIGNMENT_STATUSES = ["Assigned", "Confirmed", "Tentative", "Declined", "Cancelled"];
+
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function parseNumber(value: string) {
   const n = Number(value);
@@ -37,13 +76,25 @@ function normalizedVisibility(value: string | null): Visibility {
   return value?.toLowerCase() === "personal" ? "personal" : "team";
 }
 
-function shortage(event: {
-  sp_needed: number | null;
-  sp_assigned: number | null;
-}) {
-  const needed = event.sp_needed ?? 0;
-  const assigned = event.sp_assigned ?? 0;
-  return Math.max(needed - assigned, 0);
+function textOrDash(value: string | null | undefined) {
+  return value && value.trim() ? value : "—";
+}
+
+function formatAvailabilityRow(row: AvailabilityRow) {
+  const day = DAY_NAMES[row.day_of_week] ?? `Day ${row.day_of_week}`;
+  const type = row.availability_type?.trim() || "Available";
+  const time =
+    row.start_time || row.end_time
+      ? ` (${row.start_time || "?"}–${row.end_time || "?"})`
+      : "";
+  const note = row.notes?.trim() ? ` — ${row.notes.trim()}` : "";
+  return `${day}: ${type}${time}${note}`;
+}
+
+function uniqueById<T extends { id: string }>(items: T[]) {
+  const map = new Map<string, T>();
+  for (const item of items) map.set(item.id, item);
+  return Array.from(map.values());
 }
 
 export default function EventDetailsPage() {
@@ -54,12 +105,13 @@ export default function EventDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const [refreshingAssignments, setRefreshingAssignments] = useState(false);
 
   const [name, setName] = useState("");
   const [status, setStatus] = useState("Needs SPs");
   const [dateText, setDateText] = useState("");
   const [spNeeded, setSpNeeded] = useState("");
-  const [spAssigned, setSpAssigned] = useState("");
   const [visibility, setVisibility] = useState<Visibility>("team");
 
   const [location, setLocation] = useState("");
@@ -68,14 +120,34 @@ export default function EventDetailsPage() {
   const [facultyContact, setFacultyContact] = useState("");
   const [notes, setNotes] = useState("");
 
+  const [allSPs, setAllSPs] = useState<SPRow[]>([]);
+  const [eventAssignments, setEventAssignments] = useState<EventSPRow[]>([]);
+  const [availabilityRows, setAvailabilityRows] = useState<AvailabilityRow[]>([]);
+
+  const [selectedSpId, setSelectedSpId] = useState("");
+  const [assignmentRoleName, setAssignmentRoleName] = useState("");
+  const [assignmentStatus, setAssignmentStatus] = useState("Assigned");
+  const [assignmentNotes, setAssignmentNotes] = useState("");
+
+  async function syncAssignedCount(nextCount: number) {
+    if (!eventId || typeof eventId !== "string") return;
+
+    const { error } = await supabase
+      .from("events")
+      .update({ sp_assigned: nextCount })
+      .eq("id", eventId);
+
+    if (error) {
+      console.error("Could not sync assigned count:", error);
+    }
+  }
+
   async function loadEvent() {
     if (!eventId || typeof eventId !== "string") {
       alert("Missing event ID.");
       router.push("/");
       return;
     }
-
-    setLoading(true);
 
     const { data, error } = await supabase
       .from("events")
@@ -102,7 +174,6 @@ export default function EventDetailsPage() {
     if (error || !data) {
       console.error("Error loading event:", error);
       alert("Could not load event details.");
-      setLoading(false);
       router.push("/");
       return;
     }
@@ -113,21 +184,189 @@ export default function EventDetailsPage() {
     setStatus(event.status ?? "Needs SPs");
     setDateText(event.date_text ?? "");
     setSpNeeded(String(event.sp_needed ?? 0));
-    setSpAssigned(String(event.sp_assigned ?? 0));
     setVisibility(normalizedVisibility(event.visibility));
-
     setLocation(event.location ?? "");
     setZoomLink(event.zoom_link ?? "");
     setTrainingInfo(event.training_info ?? "");
     setFacultyContact(event.faculty_contact ?? "");
     setNotes(event.notes ?? "");
+  }
+
+  async function loadSPs() {
+    const { data, error } = await supabase
+      .from("sps")
+      .select(
+        `
+          id,
+          full_name,
+          email,
+          phone,
+          status,
+          notes,
+          age_range,
+          gender,
+          ethnicity,
+          skills,
+          availability,
+          actor_notes,
+          created_at
+        `
+      )
+      .order("full_name", { ascending: true });
+
+    if (error) {
+      console.error("Error loading SPs:", error);
+      alert("Could not load SP database.");
+      return;
+    }
+
+    setAllSPs((data as SPRow[]) ?? []);
+  }
+
+  async function loadAssignments() {
+    if (!eventId || typeof eventId !== "string") return;
+
+    setRefreshingAssignments(true);
+
+    const { data, error } = await supabase
+      .from("event_sps")
+      .select(
+        `
+          id,
+          event_id,
+          sp_id,
+          role_name,
+          assignment_status,
+          notes,
+          created_at
+        `
+      )
+      .eq("event_id", eventId)
+      .order("created_at", { ascending: true });
+
+    setRefreshingAssignments(false);
+
+    if (error) {
+      console.error("Error loading assignments:", error);
+      alert("Could not load assigned SPs.");
+      return;
+    }
+
+    const rows = (data as EventSPRow[]) ?? [];
+    setEventAssignments(rows);
+    await syncAssignedCount(rows.length);
+  }
+
+  async function loadAvailability(spIds?: string[]) {
+    const ids = (spIds ?? []).filter(Boolean);
+    if (ids.length === 0) {
+      setAvailabilityRows([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("sp_availability")
+      .select(
+        `
+          id,
+          sp_id,
+          day_of_week,
+          start_time,
+          end_time,
+          availability_type,
+          notes,
+          created_at
+        `
+      )
+      .in("sp_id", ids)
+      .order("day_of_week", { ascending: true })
+      .order("start_time", { ascending: true });
+
+    if (error) {
+      console.error("Error loading availability:", error);
+      return;
+    }
+
+    setAvailabilityRows((data as AvailabilityRow[]) ?? []);
+  }
+
+  async function fullLoad() {
+    if (!eventId || typeof eventId !== "string") return;
+
+    setLoading(true);
+    await loadEvent();
+    await loadSPs();
+
+    const { data: assignmentData, error: assignmentError } = await supabase
+      .from("event_sps")
+      .select(
+        `
+          id,
+          event_id,
+          sp_id,
+          role_name,
+          assignment_status,
+          notes,
+          created_at
+        `
+      )
+      .eq("event_id", eventId)
+      .order("created_at", { ascending: true });
+
+    if (assignmentError) {
+      console.error("Error loading assignments:", assignmentError);
+      alert("Could not load assigned SPs.");
+      setLoading(false);
+      return;
+    }
+
+    const assignments = (assignmentData as EventSPRow[]) ?? [];
+    setEventAssignments(assignments);
+    await syncAssignedCount(assignments.length);
+
+    const assignedSpIds = uniqueById(
+      assignments.map((a) => ({ id: a.sp_id }))
+    ).map((x) => x.id);
+
+    if (assignedSpIds.length > 0) {
+      await loadAvailability(assignedSpIds);
+    } else {
+      setAvailabilityRows([]);
+    }
 
     setLoading(false);
   }
 
   useEffect(() => {
-    loadEvent();
+    fullLoad();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
+
+  const assignedCount = eventAssignments.length;
+
+  const assignedSpIdSet = useMemo(() => {
+    return new Set(eventAssignments.map((a) => a.sp_id));
+  }, [eventAssignments]);
+
+  const availableSPOptions = useMemo(() => {
+    return allSPs.filter((sp) => !assignedSpIdSet.has(sp.id));
+  }, [allSPs, assignedSpIdSet]);
+
+  const assignmentCards = useMemo(() => {
+    return eventAssignments.map((assignment) => {
+      const sp = allSPs.find((item) => item.id === assignment.sp_id) ?? null;
+      const spAvailability = availabilityRows.filter((row) => row.sp_id === assignment.sp_id);
+      return {
+        assignment,
+        sp,
+        spAvailability,
+      };
+    });
+  }, [eventAssignments, allSPs, availabilityRows]);
+
+  const liveShortage = useMemo(() => {
+    return Math.max(parseNumber(spNeeded) - assignedCount, 0);
+  }, [spNeeded, assignedCount]);
 
   async function handleSave() {
     if (!eventId || typeof eventId !== "string") return;
@@ -136,7 +375,6 @@ export default function EventDetailsPage() {
     const cleanName = name.trim();
     const cleanDateText = dateText.trim();
     const needed = parseNumber(spNeeded);
-    const assigned = parseNumber(spAssigned);
 
     if (!cleanName) {
       alert("Please enter an event name.");
@@ -148,11 +386,6 @@ export default function EventDetailsPage() {
       return;
     }
 
-    if (assigned > needed) {
-      alert("SP Assigned cannot be greater than SP Needed.");
-      return;
-    }
-
     setSaving(true);
 
     const payload = {
@@ -160,7 +393,7 @@ export default function EventDetailsPage() {
       status,
       date_text: cleanDateText,
       sp_needed: needed,
-      sp_assigned: assigned,
+      sp_assigned: assignedCount,
       visibility,
       location: location.trim(),
       zoom_link: zoomLink.trim(),
@@ -174,14 +407,14 @@ export default function EventDetailsPage() {
       .update(payload)
       .eq("id", eventId);
 
+    setSaving(false);
+
     if (error) {
       console.error("Save error:", error);
       alert("Could not save event: " + error.message);
-      setSaving(false);
       return;
     }
 
-    setSaving(false);
     alert("Event updated.");
     await loadEvent();
   }
@@ -207,9 +440,73 @@ export default function EventDetailsPage() {
     router.push("/");
   }
 
-  const liveShortage = useMemo(() => {
-    return Math.max(parseNumber(spNeeded) - parseNumber(spAssigned), 0);
-  }, [spNeeded, spAssigned]);
+  async function handleAssignSP() {
+    if (!eventId || typeof eventId !== "string") return;
+    if (!selectedSpId) {
+      alert("Please select an SP.");
+      return;
+    }
+    if (assigning) return;
+
+    setAssigning(true);
+
+    const payload = {
+      event_id: eventId,
+      sp_id: selectedSpId,
+      role_name: assignmentRoleName.trim() || null,
+      assignment_status: assignmentStatus || "Assigned",
+      notes: assignmentNotes.trim() || null,
+    };
+
+    const { error } = await supabase.from("event_sps").insert([payload]);
+
+    setAssigning(false);
+
+    if (error) {
+      console.error("Assign error:", error);
+      alert("Could not assign SP: " + error.message);
+      return;
+    }
+
+    setSelectedSpId("");
+    setAssignmentRoleName("");
+    setAssignmentStatus("Assigned");
+    setAssignmentNotes("");
+
+    await loadAssignments();
+
+    const nextAssignedIds = uniqueById(
+      [...eventAssignments.map((a) => ({ id: a.sp_id })), { id: payload.sp_id }]
+    ).map((x) => x.id);
+
+    await loadAvailability(nextAssignedIds);
+  }
+
+  async function handleRemoveAssignment(assignmentId: string) {
+    const ok = window.confirm("Remove this SP from the event?");
+    if (!ok) return;
+
+    const { error } = await supabase
+      .from("event_sps")
+      .delete()
+      .eq("id", assignmentId);
+
+    if (error) {
+      console.error("Remove assignment error:", error);
+      alert("Could not remove assignment: " + error.message);
+      return;
+    }
+
+    const nextAssignments = eventAssignments.filter((a) => a.id !== assignmentId);
+    setEventAssignments(nextAssignments);
+    await syncAssignedCount(nextAssignments.length);
+
+    const nextIds = uniqueById(
+      nextAssignments.map((a) => ({ id: a.sp_id }))
+    ).map((x) => x.id);
+
+    await loadAvailability(nextIds);
+  }
 
   if (loading) {
     return (
@@ -227,9 +524,10 @@ export default function EventDetailsPage() {
         <section style={topBarStyle}>
           <div style={brandWrapStyle}>
             <img src="/cfsp-logo.png" alt="CFSP Logo" style={logoStyle} />
-           <Link href="/" style={toolbarGhostLinkStyle}>
-  ← Back to Board
-</Link>
+            <div>
+              <h1 style={titleStyle}>{name || "Event Details"}</h1>
+              <p style={subtitleStyle}>Event operations, SP assignments, and availability view</p>
+            </div>
           </div>
 
           <div style={toolbarStyle}>
@@ -268,7 +566,7 @@ export default function EventDetailsPage() {
 
           <div style={statCardStyle}>
             <div style={statLabelStyle}>SP Assigned</div>
-            <div style={statValueStyle}>{parseNumber(spAssigned)}</div>
+            <div style={statValueStyle}>{assignedCount}</div>
           </div>
 
           <div style={statCardStyle}>
@@ -354,11 +652,9 @@ export default function EventDetailsPage() {
             <div>
               <label style={labelStyle}>SP Assigned</label>
               <input
-                value={spAssigned}
-                onChange={(e) => setSpAssigned(e.target.value)}
-                style={inputStyle}
-                type="number"
-                min="0"
+                value={String(assignedCount)}
+                style={{ ...inputStyle, background: "#f8fafc", color: "#667085" }}
+                readOnly
               />
             </div>
           </div>
@@ -420,6 +716,159 @@ export default function EventDetailsPage() {
               />
             </div>
           </div>
+        </section>
+
+        <section style={panelStyle}>
+          <div style={panelHeaderStyle}>
+            <div style={panelTitleStyle}>Assign SPs to This Event</div>
+            <div style={panelHeaderMetaStyle}>
+              {refreshingAssignments ? "Refreshing..." : `${assignedCount} assigned`}
+            </div>
+          </div>
+
+          <div style={gridStyle}>
+            <div>
+              <label style={labelStyle}>Choose SP</label>
+              <select
+                value={selectedSpId}
+                onChange={(e) => setSelectedSpId(e.target.value)}
+                style={inputStyle}
+              >
+                <option value="">Select an SP</option>
+                {availableSPOptions.map((sp) => (
+                  <option key={sp.id} value={sp.id}>
+                    {(sp.full_name ?? "Unnamed SP") +
+                      (sp.status ? ` — ${sp.status}` : "")}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label style={labelStyle}>Role Name</label>
+              <input
+                value={assignmentRoleName}
+                onChange={(e) => setAssignmentRoleName(e.target.value)}
+                style={inputStyle}
+                placeholder="Chest pain case, parent role, etc."
+              />
+            </div>
+
+            <div>
+              <label style={labelStyle}>Assignment Status</label>
+              <select
+                value={assignmentStatus}
+                onChange={(e) => setAssignmentStatus(e.target.value)}
+                style={inputStyle}
+              >
+                {ASSIGNMENT_STATUSES.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "end" }}>
+              <button
+                onClick={handleAssignSP}
+                style={{ ...toolbarPrimaryButtonStyle, width: "100%" }}
+                disabled={assigning}
+              >
+                {assigning ? "Assigning..." : "Assign SP"}
+              </button>
+            </div>
+
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={labelStyle}>Assignment Notes</label>
+              <textarea
+                value={assignmentNotes}
+                onChange={(e) => setAssignmentNotes(e.target.value)}
+                style={textareaStyle}
+                placeholder="Special fit, tentative hold, callback notes..."
+              />
+            </div>
+          </div>
+
+          {assignmentCards.length === 0 ? (
+            <div style={emptyStateStyle}>No SPs assigned to this event yet.</div>
+          ) : (
+            <div style={assignmentListStyle}>
+              {assignmentCards.map(({ assignment, sp, spAvailability }) => (
+                <div key={assignment.id} style={assignmentCardStyle}>
+                  <div style={assignmentTopRowStyle}>
+                    <div>
+                      <div style={assignmentNameStyle}>
+                        {sp?.full_name?.trim() || "Unnamed SP"}
+                      </div>
+                      <div style={assignmentMetaStyle}>
+                        {assignment.role_name?.trim() || "No role name"} ·{" "}
+                        {assignment.assignment_status?.trim() || "Assigned"}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleRemoveAssignment(assignment.id)}
+                      style={smallDangerButtonStyle}
+                    >
+                      Remove
+                    </button>
+                  </div>
+
+                  <div style={assignmentInfoGridStyle}>
+                    <div style={infoCardStyle}>
+                      <div style={infoLabelStyle}>Email</div>
+                      <div style={infoValueStyle}>{textOrDash(sp?.email)}</div>
+                    </div>
+
+                    <div style={infoCardStyle}>
+                      <div style={infoLabelStyle}>Phone</div>
+                      <div style={infoValueStyle}>{textOrDash(sp?.phone)}</div>
+                    </div>
+
+                    <div style={infoCardStyle}>
+                      <div style={infoLabelStyle}>Age Range</div>
+                      <div style={infoValueStyle}>{textOrDash(sp?.age_range)}</div>
+                    </div>
+
+                    <div style={infoCardStyle}>
+                      <div style={infoLabelStyle}>Gender</div>
+                      <div style={infoValueStyle}>{textOrDash(sp?.gender)}</div>
+                    </div>
+
+                    <div style={fullWidthInfoCardStyle}>
+                      <div style={infoLabelStyle}>Skills</div>
+                      <div style={infoValueStyle}>{textOrDash(sp?.skills)}</div>
+                    </div>
+
+                    <div style={fullWidthInfoCardStyle}>
+                      <div style={infoLabelStyle}>Assignment Notes</div>
+                      <div style={infoValueStyle}>{textOrDash(assignment.notes)}</div>
+                    </div>
+
+                    <div style={fullWidthInfoCardStyle}>
+                      <div style={infoLabelStyle}>Structured Availability</div>
+                      <div style={infoValueStyle}>
+                        {spAvailability.length > 0
+                          ? spAvailability.map((row) => formatAvailabilityRow(row)).join("\n")
+                          : "—"}
+                      </div>
+                    </div>
+
+                    <div style={fullWidthInfoCardStyle}>
+                      <div style={infoLabelStyle}>Availability Notes</div>
+                      <div style={infoValueStyle}>{textOrDash(sp?.availability)}</div>
+                    </div>
+
+                    <div style={fullWidthInfoCardStyle}>
+                      <div style={infoLabelStyle}>Actor Notes</div>
+                      <div style={infoValueStyle}>{textOrDash(sp?.actor_notes)}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </main>
@@ -588,6 +1037,12 @@ const panelTitleStyle: React.CSSProperties = {
   color: "#101828",
 };
 
+const panelHeaderMetaStyle: React.CSSProperties = {
+  fontSize: 14,
+  color: "#667085",
+  fontWeight: 600,
+};
+
 const gridStyle: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
@@ -631,4 +1086,93 @@ const textareaStyle: React.CSSProperties = {
 const largeTextareaStyle: React.CSSProperties = {
   ...textareaStyle,
   minHeight: 160,
+};
+
+const emptyStateStyle: React.CSSProperties = {
+  marginTop: 16,
+  border: "1px dashed #cbd5e1",
+  borderRadius: 18,
+  padding: 18,
+  color: "#667085",
+  background: "#f8fafc",
+  fontWeight: 600,
+};
+
+const assignmentListStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 14,
+  marginTop: 18,
+};
+
+const assignmentCardStyle: React.CSSProperties = {
+  border: "1px solid #d8e1ec",
+  borderRadius: 20,
+  padding: 16,
+  background: "#fdfefe",
+};
+
+const assignmentTopRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  justifyContent: "space-between",
+  gap: 12,
+  marginBottom: 14,
+  flexWrap: "wrap",
+};
+
+const assignmentNameStyle: React.CSSProperties = {
+  fontSize: 22,
+  fontWeight: 700,
+  color: "#101828",
+};
+
+const assignmentMetaStyle: React.CSSProperties = {
+  fontSize: 14,
+  color: "#667085",
+  marginTop: 6,
+};
+
+const smallDangerButtonStyle: React.CSSProperties = {
+  border: "1px solid #f04438",
+  background: "#ffffff",
+  color: "#b42318",
+  borderRadius: 12,
+  padding: "10px 14px",
+  fontSize: 14,
+  fontWeight: 600,
+  cursor: "pointer",
+};
+
+const assignmentInfoGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: 12,
+};
+
+const infoCardStyle: React.CSSProperties = {
+  border: "1px solid #e2e8f0",
+  borderRadius: 16,
+  padding: 14,
+  background: "#f8fafc",
+};
+
+const fullWidthInfoCardStyle: React.CSSProperties = {
+  ...infoCardStyle,
+  gridColumn: "1 / -1",
+};
+
+const infoLabelStyle: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+  color: "#667085",
+  marginBottom: 8,
+};
+
+const infoValueStyle: React.CSSProperties = {
+  fontSize: 15,
+  color: "#101828",
+  lineHeight: 1.5,
+  whiteSpace: "pre-wrap",
 };
