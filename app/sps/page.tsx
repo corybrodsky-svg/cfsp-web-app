@@ -8,51 +8,45 @@ type SPRow = {
   id: string;
   full_name: string | null;
   email: string | null;
+  working_email: string | null;
+  secondary_email: string | null;
   phone: string | null;
+  secondary_phone: string | null;
   status: string | null;
-  notes: string | null;
-  age_range: string | null;
-  gender: string | null;
-  ethnicity: string | null;
-  skills: string | null;
-  availability: string | null;
-  actor_notes: string | null;
+  last_name: string | null;
+  first_name: string | null;
+  portrayal_age: string | null;
+  race: string | null;
+  sex: string | null;
+  do_not_hire_for: string | null;
+  telehealth: string | null;
+  pt_preferred: string | null;
+  other_roles: string | null;
+  birth_year: number | null;
+  speaks_spanish: string | null;
   created_at: string | null;
 };
 
 type SPForm = {
-  full_name: string;
-  email: string;
+  first_name: string;
+  last_name: string;
+  working_email: string;
+  secondary_email: string;
   phone: string;
+  secondary_phone: string;
   status: string;
-  notes: string;
-  age_range: string;
-  gender: string;
-  ethnicity: string;
-  skills: string;
-  availability: string;
-  actor_notes: string;
+  portrayal_age: string;
+  race: string;
+  sex: string;
+  do_not_hire_for: string;
+  telehealth: string;
+  pt_preferred: string;
+  other_roles: string;
+  birth_year: string;
+  speaks_spanish: string;
 };
 
 const STATUS_OPTIONS = ["Active", "Inactive"];
-const AGE_RANGE_OPTIONS = [
-  "",
-  "18-25",
-  "26-35",
-  "36-45",
-  "46-55",
-  "56-65",
-  "65+",
-];
-const GENDER_OPTIONS = [
-  "",
-  "Female",
-  "Male",
-  "Nonbinary",
-  "Transgender",
-  "Prefer not to say",
-  "Other",
-];
 
 const pageWrap: React.CSSProperties = {
   minHeight: "100vh",
@@ -124,13 +118,6 @@ const secondaryButton: React.CSSProperties = {
   ...buttonBase,
   background: "#fff",
   color: "#1f2937",
-};
-
-const dangerButton: React.CSSProperties = {
-  ...buttonBase,
-  background: "#fff5f5",
-  color: "#b91c1c",
-  border: "1px solid #fecaca",
 };
 
 const statsGridStyle: React.CSSProperties = {
@@ -303,22 +290,35 @@ const fullRowStyle: React.CSSProperties = {
 
 function blankForm(): SPForm {
   return {
-    full_name: "",
-    email: "",
+    first_name: "",
+    last_name: "",
+    working_email: "",
+    secondary_email: "",
     phone: "",
+    secondary_phone: "",
     status: "Active",
-    notes: "",
-    age_range: "",
-    gender: "",
-    ethnicity: "",
-    skills: "",
-    availability: "",
-    actor_notes: "",
+    portrayal_age: "",
+    race: "",
+    sex: "",
+    do_not_hire_for: "",
+    telehealth: "",
+    pt_preferred: "",
+    other_roles: "",
+    birth_year: "",
+    speaks_spanish: "",
   };
 }
 
-function textOrDash(value: string | null | undefined) {
-  return value && value.trim() ? value : "—";
+function textOrDash(value: string | number | null | undefined) {
+  if (value === null || value === undefined) return "—";
+  const s = String(value).trim();
+  return s ? s : "—";
+}
+
+function buildFullName(first: string, last: string) {
+  return `${first}`.trim() || `${last}`.trim()
+    ? `${first}`.trim() + (`${first}`.trim() && `${last}`.trim() ? " " : "") + `${last}`.trim()
+    : "";
 }
 
 export default function SPDatabasePage() {
@@ -335,9 +335,30 @@ export default function SPDatabasePage() {
     const { data, error } = await supabase
       .from("sps")
       .select(
-        "id, full_name, email, phone, status, notes, age_range, gender, ethnicity, skills, availability, actor_notes, created_at"
+        `
+          id,
+          full_name,
+          email,
+          working_email,
+          secondary_email,
+          phone,
+          secondary_phone,
+          status,
+          last_name,
+          first_name,
+          portrayal_age,
+          race,
+          sex,
+          do_not_hire_for,
+          telehealth,
+          pt_preferred,
+          other_roles,
+          birth_year,
+          speaks_spanish,
+          created_at
+        `
       )
-      .order("created_at", { ascending: false });
+      .order("full_name", { ascending: true });
 
     setLoading(false);
 
@@ -361,16 +382,23 @@ export default function SPDatabasePage() {
     return sps.filter((sp) => {
       const haystack = [
         sp.full_name,
+        sp.first_name,
+        sp.last_name,
         sp.email,
+        sp.working_email,
+        sp.secondary_email,
         sp.phone,
-        sp.notes,
-        sp.age_range,
-        sp.gender,
-        sp.ethnicity,
-        sp.skills,
-        sp.availability,
-        sp.actor_notes,
+        sp.secondary_phone,
         sp.status,
+        sp.portrayal_age,
+        sp.race,
+        sp.sex,
+        sp.do_not_hire_for,
+        sp.telehealth,
+        sp.pt_preferred,
+        sp.other_roles,
+        sp.birth_year?.toString(),
+        sp.speaks_spanish,
       ]
         .filter(Boolean)
         .join(" ")
@@ -395,17 +423,22 @@ export default function SPDatabasePage() {
   function startEdit(sp: SPRow) {
     setEditingId(sp.id);
     setForm({
-      full_name: sp.full_name ?? "",
-      email: sp.email ?? "",
+      first_name: sp.first_name ?? "",
+      last_name: sp.last_name ?? "",
+      working_email: sp.working_email ?? sp.email ?? "",
+      secondary_email: sp.secondary_email ?? "",
       phone: sp.phone ?? "",
+      secondary_phone: sp.secondary_phone ?? "",
       status: sp.status ?? "Active",
-      notes: sp.notes ?? "",
-      age_range: sp.age_range ?? "",
-      gender: sp.gender ?? "",
-      ethnicity: sp.ethnicity ?? "",
-      skills: sp.skills ?? "",
-      availability: sp.availability ?? "",
-      actor_notes: sp.actor_notes ?? "",
+      portrayal_age: sp.portrayal_age ?? "",
+      race: sp.race ?? "",
+      sex: sp.sex ?? "",
+      do_not_hire_for: sp.do_not_hire_for ?? "",
+      telehealth: sp.telehealth ?? "",
+      pt_preferred: sp.pt_preferred ?? "",
+      other_roles: sp.other_roles ?? "",
+      birth_year: sp.birth_year ? String(sp.birth_year) : "",
+      speaks_spanish: sp.speaks_spanish ?? "",
     });
 
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -417,25 +450,34 @@ export default function SPDatabasePage() {
   }
 
   async function handleSave() {
-    if (!form.full_name.trim()) {
-      alert("Please enter a full name.");
+    if (!form.first_name.trim() && !form.last_name.trim()) {
+      alert("Please enter a first name or last name.");
       return;
     }
 
     setSaving(true);
 
+    const fullName = buildFullName(form.first_name, form.last_name);
+
     const payload = {
-      full_name: form.full_name.trim(),
-      email: form.email.trim() || null,
+      first_name: form.first_name.trim() || null,
+      last_name: form.last_name.trim() || null,
+      full_name: fullName || null,
+      working_email: form.working_email.trim() || null,
+      email: form.working_email.trim() || null,
+      secondary_email: form.secondary_email.trim() || null,
       phone: form.phone.trim() || null,
+      secondary_phone: form.secondary_phone.trim() || null,
       status: form.status.trim() || "Active",
-      notes: form.notes.trim() || null,
-      age_range: form.age_range.trim() || null,
-      gender: form.gender.trim() || null,
-      ethnicity: form.ethnicity.trim() || null,
-      skills: form.skills.trim() || null,
-      availability: form.availability.trim() || null,
-      actor_notes: form.actor_notes.trim() || null,
+      portrayal_age: form.portrayal_age.trim() || null,
+      race: form.race.trim() || null,
+      sex: form.sex.trim() || null,
+      do_not_hire_for: form.do_not_hire_for.trim() || null,
+      telehealth: form.telehealth.trim() || null,
+      pt_preferred: form.pt_preferred.trim() || null,
+      other_roles: form.other_roles.trim() || null,
+      birth_year: form.birth_year.trim() ? Number(form.birth_year.trim()) : null,
+      speaks_spanish: form.speaks_spanish.trim() || null,
     };
 
     let error = null;
@@ -519,22 +561,42 @@ export default function SPDatabasePage() {
 
           <div style={formGridStyle}>
             <div>
-              <label style={fieldLabelStyle}>Full Name</label>
+              <label style={fieldLabelStyle}>First Name</label>
               <input
                 style={inputStyle}
-                value={form.full_name}
-                onChange={(e) => updateForm("full_name", e.target.value)}
-                placeholder="Jane Doe"
+                value={form.first_name}
+                onChange={(e) => updateForm("first_name", e.target.value)}
+                placeholder="Jane"
               />
             </div>
 
             <div>
-              <label style={fieldLabelStyle}>Email</label>
+              <label style={fieldLabelStyle}>Last Name</label>
               <input
                 style={inputStyle}
-                value={form.email}
-                onChange={(e) => updateForm("email", e.target.value)}
+                value={form.last_name}
+                onChange={(e) => updateForm("last_name", e.target.value)}
+                placeholder="Doe"
+              />
+            </div>
+
+            <div>
+              <label style={fieldLabelStyle}>Working Email</label>
+              <input
+                style={inputStyle}
+                value={form.working_email}
+                onChange={(e) => updateForm("working_email", e.target.value)}
                 placeholder="jane@example.com"
+              />
+            </div>
+
+            <div>
+              <label style={fieldLabelStyle}>Secondary Email</label>
+              <input
+                style={inputStyle}
+                value={form.secondary_email}
+                onChange={(e) => updateForm("secondary_email", e.target.value)}
+                placeholder="Optional"
               />
             </div>
 
@@ -545,6 +607,16 @@ export default function SPDatabasePage() {
                 value={form.phone}
                 onChange={(e) => updateForm("phone", e.target.value)}
                 placeholder="(555) 555-5555"
+              />
+            </div>
+
+            <div>
+              <label style={fieldLabelStyle}>Secondary Phone</label>
+              <input
+                style={inputStyle}
+                value={form.secondary_phone}
+                onChange={(e) => updateForm("secondary_phone", e.target.value)}
+                placeholder="Optional"
               />
             </div>
 
@@ -564,83 +636,93 @@ export default function SPDatabasePage() {
             </div>
 
             <div>
-              <label style={fieldLabelStyle}>Age Range</label>
-              <select
-                style={inputStyle}
-                value={form.age_range}
-                onChange={(e) => updateForm("age_range", e.target.value)}
-              >
-                {AGE_RANGE_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option || "Select age range"}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label style={fieldLabelStyle}>Gender</label>
-              <select
-                style={inputStyle}
-                value={form.gender}
-                onChange={(e) => updateForm("gender", e.target.value)}
-              >
-                {GENDER_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option || "Select gender"}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label style={fieldLabelStyle}>Ethnicity</label>
+              <label style={fieldLabelStyle}>Portrayal Age</label>
               <input
                 style={inputStyle}
-                value={form.ethnicity}
-                onChange={(e) => updateForm("ethnicity", e.target.value)}
-                placeholder="Optional"
+                value={form.portrayal_age}
+                onChange={(e) => updateForm("portrayal_age", e.target.value)}
+                placeholder="20's, 30-50, 55+..."
               />
             </div>
 
             <div>
-              <label style={fieldLabelStyle}>Skills</label>
+              <label style={fieldLabelStyle}>Race</label>
               <input
                 style={inputStyle}
-                value={form.skills}
-                onChange={(e) => updateForm("skills", e.target.value)}
-                placeholder="Pediatrics, psych, physical exam..."
+                value={form.race}
+                onChange={(e) => updateForm("race", e.target.value)}
+                placeholder="W, B, A, H..."
+              />
+            </div>
+
+            <div>
+              <label style={fieldLabelStyle}>Sex</label>
+              <input
+                style={inputStyle}
+                value={form.sex}
+                onChange={(e) => updateForm("sex", e.target.value)}
+                placeholder="F, M, they/them..."
+              />
+            </div>
+
+            <div>
+              <label style={fieldLabelStyle}>Birth Year</label>
+              <input
+                style={inputStyle}
+                value={form.birth_year}
+                onChange={(e) => updateForm("birth_year", e.target.value)}
+                placeholder="1985"
+              />
+            </div>
+
+            <div>
+              <label style={fieldLabelStyle}>Speaks Spanish</label>
+              <input
+                style={inputStyle}
+                value={form.speaks_spanish}
+                onChange={(e) => updateForm("speaks_spanish", e.target.value)}
+                placeholder="Yes / No / blank"
+              />
+            </div>
+
+            <div>
+              <label style={fieldLabelStyle}>Telehealth</label>
+              <input
+                style={inputStyle}
+                value={form.telehealth}
+                onChange={(e) => updateForm("telehealth", e.target.value)}
+                placeholder="Zoom, SimIQ"
+              />
+            </div>
+
+            <div>
+              <label style={fieldLabelStyle}>PT Preferred</label>
+              <input
+                style={inputStyle}
+                value={form.pt_preferred}
+                onChange={(e) => updateForm("pt_preferred", e.target.value)}
+                placeholder="Primary, Secondary, no"
+              />
+            </div>
+
+            <div>
+              <label style={fieldLabelStyle}>Other Roles</label>
+              <input
+                style={inputStyle}
+                value={form.other_roles}
+                onChange={(e) => updateForm("other_roles", e.target.value)}
+                placeholder="On Campus, Virtual"
               />
             </div>
           </div>
 
           <div style={{ marginTop: "14px" }}>
-            <label style={fieldLabelStyle}>Availability</label>
+            <label style={fieldLabelStyle}>Do Not Hire For</label>
             <textarea
               style={textareaStyle}
-              value={form.availability}
-              onChange={(e) => updateForm("availability", e.target.value)}
-              placeholder="Weekdays, evenings, virtual only, limited Fridays..."
-            />
-          </div>
-
-          <div style={{ marginTop: "14px" }}>
-            <label style={fieldLabelStyle}>General Notes</label>
-            <textarea
-              style={textareaStyle}
-              value={form.notes}
-              onChange={(e) => updateForm("notes", e.target.value)}
-              placeholder="Casting notes, experience, reminders..."
-            />
-          </div>
-
-          <div style={{ marginTop: "14px" }}>
-            <label style={fieldLabelStyle}>Actor Notes / Demographic Notes</label>
-            <textarea
-              style={textareaStyle}
-              value={form.actor_notes}
-              onChange={(e) => updateForm("actor_notes", e.target.value)}
-              placeholder="Accent, look range, prior roles, wardrobe notes, other useful details..."
+              value={form.do_not_hire_for}
+              onChange={(e) => updateForm("do_not_hire_for", e.target.value)}
+              placeholder="Restrictions, non-casting notes, limitations..."
             />
           </div>
 
@@ -670,7 +752,7 @@ export default function SPDatabasePage() {
             style={searchStyle}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name, email, phone, notes, skills, demographics..."
+            placeholder="Search name, email, phone, race, sex, portrayal age, telehealth, restrictions..."
           />
 
           <div style={directoryGridStyle}>
@@ -702,8 +784,10 @@ export default function SPDatabasePage() {
 
                 <div style={infoGridStyle}>
                   <div style={infoBoxStyle}>
-                    <div style={infoLabelStyle}>Email</div>
-                    <div style={infoValueStyle}>{textOrDash(sp.email)}</div>
+                    <div style={infoLabelStyle}>Working Email</div>
+                    <div style={infoValueStyle}>
+                      {textOrDash(sp.working_email ?? sp.email)}
+                    </div>
                   </div>
 
                   <div style={infoBoxStyle}>
@@ -712,38 +796,58 @@ export default function SPDatabasePage() {
                   </div>
 
                   <div style={infoBoxStyle}>
-                    <div style={infoLabelStyle}>Age Range</div>
-                    <div style={infoValueStyle}>{textOrDash(sp.age_range)}</div>
+                    <div style={infoLabelStyle}>Secondary Email</div>
+                    <div style={infoValueStyle}>{textOrDash(sp.secondary_email)}</div>
                   </div>
 
                   <div style={infoBoxStyle}>
-                    <div style={infoLabelStyle}>Gender</div>
-                    <div style={infoValueStyle}>{textOrDash(sp.gender)}</div>
+                    <div style={infoLabelStyle}>Secondary Phone</div>
+                    <div style={infoValueStyle}>{textOrDash(sp.secondary_phone)}</div>
+                  </div>
+
+                  <div style={infoBoxStyle}>
+                    <div style={infoLabelStyle}>Portrayal Age</div>
+                    <div style={infoValueStyle}>{textOrDash(sp.portrayal_age)}</div>
+                  </div>
+
+                  <div style={infoBoxStyle}>
+                    <div style={infoLabelStyle}>Birth Year</div>
+                    <div style={infoValueStyle}>{textOrDash(sp.birth_year)}</div>
+                  </div>
+
+                  <div style={infoBoxStyle}>
+                    <div style={infoLabelStyle}>Race</div>
+                    <div style={infoValueStyle}>{textOrDash(sp.race)}</div>
+                  </div>
+
+                  <div style={infoBoxStyle}>
+                    <div style={infoLabelStyle}>Sex</div>
+                    <div style={infoValueStyle}>{textOrDash(sp.sex)}</div>
+                  </div>
+
+                  <div style={infoBoxStyle}>
+                    <div style={infoLabelStyle}>Speaks Spanish</div>
+                    <div style={infoValueStyle}>{textOrDash(sp.speaks_spanish)}</div>
+                  </div>
+
+                  <div style={infoBoxStyle}>
+                    <div style={infoLabelStyle}>Telehealth</div>
+                    <div style={infoValueStyle}>{textOrDash(sp.telehealth)}</div>
+                  </div>
+
+                  <div style={infoBoxStyle}>
+                    <div style={infoLabelStyle}>PT Preferred</div>
+                    <div style={infoValueStyle}>{textOrDash(sp.pt_preferred)}</div>
+                  </div>
+
+                  <div style={infoBoxStyle}>
+                    <div style={infoLabelStyle}>Other Roles</div>
+                    <div style={infoValueStyle}>{textOrDash(sp.other_roles)}</div>
                   </div>
 
                   <div style={fullRowStyle}>
-                    <div style={infoLabelStyle}>Ethnicity</div>
-                    <div style={infoValueStyle}>{textOrDash(sp.ethnicity)}</div>
-                  </div>
-
-                  <div style={fullRowStyle}>
-                    <div style={infoLabelStyle}>Skills</div>
-                    <div style={infoValueStyle}>{textOrDash(sp.skills)}</div>
-                  </div>
-
-                  <div style={fullRowStyle}>
-                    <div style={infoLabelStyle}>Availability</div>
-                    <div style={infoValueStyle}>{textOrDash(sp.availability)}</div>
-                  </div>
-
-                  <div style={fullRowStyle}>
-                    <div style={infoLabelStyle}>Notes</div>
-                    <div style={infoValueStyle}>{textOrDash(sp.notes)}</div>
-                  </div>
-
-                  <div style={fullRowStyle}>
-                    <div style={infoLabelStyle}>Actor Notes / Demographic Notes</div>
-                    <div style={infoValueStyle}>{textOrDash(sp.actor_notes)}</div>
+                    <div style={infoLabelStyle}>Do Not Hire For</div>
+                    <div style={infoValueStyle}>{textOrDash(sp.do_not_hire_for)}</div>
                   </div>
                 </div>
               </div>
