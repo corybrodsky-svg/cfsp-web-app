@@ -416,7 +416,9 @@ export default function EventDetailsPage() {
     }
 
     alert("Event updated.");
-    await loadEvent();
+router.refresh();
+await loadEvent();
+router.push("/");
   }
 
   async function handleDelete() {
