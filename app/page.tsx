@@ -1,9 +1,30 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { supabase } from "./lib/supabaseClient";
+import { useEffect } from "react";
+import { supabase } from "../lib/supabaseClient";
+import { useRouter } from "next/navigation";
 
+export default function Home() {
+  const router = useRouter();
+
+  useEffect(() => {
+    async function checkUser() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        router.push("/dashboard");
+      } else {
+        router.push("/login");
+      }
+    }
+
+    checkUser();
+  }, [router]);
+
+  return <div>Loading...</div>;
+}
 type Visibility = "team" | "personal";
 type ViewFilter = "all" | Visibility;
 
