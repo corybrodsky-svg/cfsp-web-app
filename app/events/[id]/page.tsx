@@ -367,7 +367,6 @@ export default function EventDetailsPage() {
   const liveShortage = useMemo(() => {
     return Math.max(parseNumber(spNeeded) - assignedCount, 0);
   }, [spNeeded, assignedCount]);
-
   async function handleSave() {
     if (!eventId || typeof eventId !== "string") return;
     if (saving) return;
@@ -416,10 +415,42 @@ export default function EventDetailsPage() {
     }
 
     alert("Event updated.");
-router.refresh();
-await loadEvent();
-router.push("/");
+    window.location.href = "/";
+    return;
   }
+
+    setSaving(true);
+
+    const payload = {
+      name: cleanName,
+      status,
+      date_text: cleanDateText,
+      sp_needed: needed,
+      sp_assigned: assignedCount,
+      visibility,
+      location: location.trim(),
+      zoom_link: zoomLink.trim(),
+      training_info: trainingInfo.trim(),
+      faculty_contact: facultyContact.trim(),
+      notes: notes.trim(),
+    };
+
+    const { error } = await supabase
+      .from("events")
+      .update(payload)
+      .eq("id", eventId);
+
+    setSaving(false);
+
+    if (error) {
+      console.error("Save error:", error);
+      alert("Could not save event: " + error.message);
+      return;
+    }
+
+alert("Event updated.");
+window.location.href = "/";
+return;
 
   async function handleDelete() {
     if (!eventId || typeof eventId !== "string") return;
