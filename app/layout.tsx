@@ -6,13 +6,18 @@ export const metadata = {
   description: "Simulation Scheduling Platform",
 };
 
-const bg = "#f4f7fb";
-const white = "#ffffff";
-const navy = "#163a70";
-const blue = "#1E5AA8";
-const green = "#2E8B57";
-const border = "#d9e2ef";
-const slate = "#5f6f86";
+const colors = {
+  bg: "#eef3f8",
+  white: "#ffffff",
+  navy: "#12376b",
+  blue: "#1E5AA8",
+  blueDark: "#163a70",
+  green: "#2E8B57",
+  greenDark: "#256b45",
+  border: "#d4deeb",
+  text: "#17345f",
+  muted: "#61748e",
+};
 
 function NavLink({
   href,
@@ -26,13 +31,14 @@ function NavLink({
       href={href}
       style={{
         textDecoration: "none",
-        color: navy,
-        fontWeight: 700,
-        fontSize: 14,
-        padding: "10px 14px",
-        borderRadius: 10,
-        border: `1px solid ${border}`,
-        background: white,
+        color: colors.text,
+        fontWeight: 800,
+        fontSize: 15,
+        padding: "14px 18px",
+        borderRadius: 14,
+        border: `1px solid ${colors.border}`,
+        background: "rgba(255,255,255,0.96)",
+        boxShadow: "0 4px 12px rgba(18,55,107,0.05)",
       }}
     >
       {label}
@@ -50,8 +56,8 @@ export default function RootLayout({
       <body
         style={{
           margin: 0,
-          background: bg,
-          color: navy,
+          background: colors.bg,
+          color: colors.text,
           fontFamily:
             'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         }}
@@ -63,18 +69,19 @@ export default function RootLayout({
             zIndex: 100,
             background: "rgba(255,255,255,0.94)",
             backdropFilter: "blur(10px)",
-            borderBottom: `1px solid ${border}`,
+            borderBottom: `1px solid ${colors.border}`,
+            boxShadow: "0 6px 18px rgba(18,55,107,0.05)",
           }}
         >
           <div
             style={{
-              maxWidth: 1280,
+              maxWidth: 1320,
               margin: "0 auto",
-              padding: "14px 20px",
+              padding: "18px 22px",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              gap: 16,
+              gap: 20,
               flexWrap: "wrap",
             }}
           >
@@ -83,26 +90,53 @@ export default function RootLayout({
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 12,
+                gap: 18,
                 textDecoration: "none",
+                minWidth: 0,
               }}
             >
               <img
                 src="/logo.png"
                 alt="Conflict-Free SP"
-                style={{ height: 42, width: "auto", display: "block" }}
+                style={{
+                  height: 64,
+                  width: "auto",
+                  display: "block",
+                  objectFit: "contain",
+                }}
               />
               <div>
-                <div style={{ fontSize: 18, fontWeight: 900, color: navy }}>
+                <div
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 900,
+                    color: colors.navy,
+                    lineHeight: 1.05,
+                  }}
+                >
                   Conflict-Free SP
                 </div>
-                <div style={{ fontSize: 12, color: slate }}>
+                <div
+                  style={{
+                    fontSize: 14,
+                    color: colors.muted,
+                    marginTop: 4,
+                    fontWeight: 600,
+                  }}
+                >
                   Simulation Scheduling Platform
                 </div>
               </div>
             </Link>
 
-            <nav style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <nav
+              style={{
+                display: "flex",
+                gap: 12,
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
               <NavLink href="/dashboard" label="Dashboard" />
               <NavLink href="/events" label="Events" />
               <NavLink href="/upload-schedule" label="Upload Schedule" />
@@ -112,7 +146,7 @@ export default function RootLayout({
           </div>
         </header>
 
-        <main style={{ maxWidth: 1280, margin: "0 auto", padding: 20 }}>
+        <main style={{ maxWidth: 1320, margin: "0 auto", padding: 24 }}>
           {children}
         </main>
       </body>
