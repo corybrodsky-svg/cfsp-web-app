@@ -289,6 +289,24 @@ const primaryButtonStyle: React.CSSProperties = {
   border: "1px solid #173d70",
 };
 
+const successStyle: React.CSSProperties = {
+  ...cardStyle,
+  marginBottom: "16px",
+  border: "1px solid #b7dfc4",
+  background: "#edf9f0",
+  color: "#14532d",
+  fontWeight: 800,
+};
+
+const errorStyle: React.CSSProperties = {
+  ...cardStyle,
+  marginBottom: "16px",
+  border: "1px solid #f0c7c7",
+  background: "#fff4f4",
+  color: "#9f1239",
+  fontWeight: 800,
+};
+
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "12px 14px",
@@ -422,6 +440,7 @@ export default function SPDirectoryPage() {
   const [rows, setRows] = useState<DirectorySP[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [savedMessage, setSavedMessage] = useState("");
   const [poolFilter, setPoolFilter] = useState<"All" | PoolType>("All");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [assignMode, setAssignMode] = useState<"existing" | "placeholder">("existing");
@@ -429,7 +448,6 @@ export default function SPDirectoryPage() {
   const [placeholderName, setPlaceholderName] = useState("");
   const [placeholderDate, setPlaceholderDate] = useState("");
   const [assignmentNote, setAssignmentNote] = useState("");
-  const [savedMessage, setSavedMessage] = useState("");
   const [assignments, setAssignments] = useState<AssignmentDraft[]>([]);
 
   useEffect(() => {
@@ -536,10 +554,13 @@ export default function SPDirectoryPage() {
     return assignments.filter((item) => item.spId === spId).length;
   }
 
-    function saveAssignment(sp: DirectorySP) {
+  function saveAssignment(sp: DirectorySP) {
+    setSavedMessage("");
+    setErrorMessage("");
+
     if (assignMode === "placeholder" && !placeholderName.trim()) {
-      setSavedMessage("Placeholder event name is required.");
-      setTimeout(() => setSavedMessage(""), 2200);
+      setErrorMessage("Placeholder event name is required.");
+      setTimeout(() => setErrorMessage(""), 2200);
       return;
     }
 
@@ -565,13 +586,14 @@ export default function SPDirectoryPage() {
 
     const next = addOrReplaceAssignment(draft);
     setAssignments(next);
-    setSavedMessage(`${sp.fullName} assigned to ${draft.eventName}.`);
     window.dispatchEvent(new Event("cfsp-assignments-updated"));
+    setSavedMessage(`${sp.fullName} assigned to ${draft.eventName}.`);
     setAssignmentNote("");
     setPlaceholderName("");
     setPlaceholderDate("");
     setTimeout(() => setSavedMessage(""), 2200);
   }
+
   return (
     <div style={pageStyle}>
       <div style={shellStyle}>
@@ -585,15 +607,10 @@ export default function SPDirectoryPage() {
             </div>
 
             <div style={actionRowStyle}>
-              <Link href="/admin" style={lightButtonStyle}>
-                Admin
-              </Link>
-              <Link href="/events" style={lightButtonStyle}>
-                Events
-              </Link>
-              <Link href="/login" style={darkButtonStyle}>
-                Login
-              </Link>
+              <Link href="/" style={lightButtonStyle}>Home</Link>
+              <Link href="/admin" style={lightButtonStyle}>Admin</Link>
+              <Link href="/events" style={lightButtonStyle}>Events</Link>
+              <Link href="/login" style={darkButtonStyle}>Login</Link>
             </div>
           </div>
         </div>
@@ -627,13 +644,8 @@ export default function SPDirectoryPage() {
           </div>
         </div>
 
-        {savedMessage ? (
-          <div style={{ ...cardStyle, marginBottom: "16px" }}>{savedMessage}</div>
-        ) : null}
-
-        {errorMessage ? (
-          <div style={{ ...cardStyle, marginBottom: "16px" }}>{errorMessage}</div>
-        ) : null}
+        {savedMessage ? <div style={successStyle}>{savedMessage}</div> : null}
+        {errorMessage ? <div style={errorStyle}>{errorMessage}</div> : null}
 
         {loading ? (
           <div style={cardStyle}>Loading SP directory...</div>
@@ -649,9 +661,7 @@ export default function SPDirectoryPage() {
                   <div style={badgeRowStyle}>
                     <div style={badgeStyle}>{sp.pool}</div>
                     <div style={badgeStyle}>{sp.portrayalAge || "Age N/A"}</div>
-                    <div style={badgeStyle}>
-                      {assignmentCountForSP(sp.id)} assigned
-                    </div>
+                    <div style={badgeStyle}>{assignmentCountForSP(sp.id)} assigned</div>
                   </div>
                 </div>
 
@@ -731,9 +741,7 @@ export default function SPDirectoryPage() {
                   <button
                     type="button"
                     style={buttonStyle}
-                    onClick={() =>
-                      setExpandedId(expandedId === sp.id ? null : sp.id)
-                    }
+                    onClick={() => setExpandedId(expandedId === sp.id ? null : sp.id)}
                   >
                     {expandedId === sp.id ? "Hide Assignment" : "Assign to Event"}
                   </button>

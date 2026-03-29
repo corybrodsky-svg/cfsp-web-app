@@ -1,731 +1,812 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  AssignmentDraft,
-  events as baseEvents,
-  EventItem,
-  getStoredAssignments,
-  getSPById,
-  resolveSimOpName,
-} from "../lib/mockData";
+import { useEffect, useMemo, useState } from "react";
 
-const EVENT_OVERRIDES_STORAGE_KEY = "cfsp_event_overrides";
+type EventStatus =
+  | "Needs SPs"
+  | "Draft"
+  | "Scheduled"
+  | "In Progress"
+  | "Completed"
+  | "Canceled";
 
-type EventOverride = Partial<
-  Pick<
-    EventItem,
-    | "name"
-    | "status"
-    | "dateText"
-    | "spNeeded"
-    | "visibility"
-    | "location"
-    | "notes"
-    | "leadSimOp"
-    | "assignedStaff"
-    | "associatedStaff"
-  >
->;
-
-type DisplayEvent = EventItem & {
-  assignedNames: string[];
+type EventItem = {
+  id: string;
+  name: string;
+  status: EventStatus;
+  date_text: string;
+  sp_needed: number;
+  sp_assigned: number;
+  notes?: string;
+  updated_at: string;
 };
 
-const pageStyle: React.CSSProperties = {
-  minHeight: "100vh",
-  background: "linear-gradient(135deg, #edf4fb 0%, #dfeaf7 100%)",
-  padding: "28px",
-};
+const STORAGE_KEY = "cfsp_events_v1";
 
-const shellStyle: React.CSSProperties = {
-  maxWidth: "1280px",
-  margin: "0 auto",
-};
+const starterEvents: EventItem[] = [
+  {
+    id: "evt-1",
+    name: "N651 Virtual",
+    status: "Needs SPs",
+    date_text: "3/10, 3/11",
+    sp_needed: 6,
+    sp_assigned: 2,
+    notes: "Initial sample event",
+    updated_at: new Date().toISOString(),
+  },
+];
 
-const heroStyle: React.CSSProperties = {
-  background: "linear-gradient(135deg, #12233f 0%, #173d70 100%)",
-  color: "#ffffff",
-  borderRadius: "24px",
-  padding: "28px",
-  boxShadow: "0 18px 40px rgba(18, 35, 63, 0.22)",
-  marginBottom: "18px",
-};
+const statuses: EventStatus[] = [
+  "Draft",
+  "Needs SPs",
+  "Scheduled",
+  "In Progress",
+  "Completed",
+  "Canceled",
+];
 
-const heroTopStyle: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  gap: "16px",
-  flexWrap: "wrap",
-  alignItems: "flex-start",
-};
+function uid() {
+  return `evt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
-const titleStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: "34px",
-  fontWeight: 900,
-};
+function loadEvents(): EventItem[] {
+  if (typeof window === "undefined") return starterEvents;
 
-const subtitleStyle: React.CSSProperties = {
-  marginTop: "8px",
-  color: "rgba(255,255,255,0.82)",
-  fontSize: "15px",
-};
-
-const navRowStyle: React.CSSProperties = {
-  display: "flex",
-  gap: "10px",
-  flexWrap: "wrap",
-};
-
-const lightButtonStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  textDecoration: "none",
-  padding: "12px 16px",
-  borderRadius: "14px",
-  background: "#ffffff",
-  color: "#173d70",
-  fontWeight: 800,
-};
-
-const darkButtonStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  textDecoration: "none",
-  padding: "12px 16px",
-  borderRadius: "14px",
-  background: "rgba(255,255,255,0.15)",
-  color: "#ffffff",
-  fontWeight: 800,
-  border: "1px solid rgba(255,255,255,0.22)",
-};
-
-const toolbarStyle: React.CSSProperties = {
-  background: "#ffffff",
-  border: "1px solid #d8e3f1",
-  borderRadius: "20px",
-  padding: "18px",
-  boxShadow: "0 12px 28px rgba(20, 40, 90, 0.08)",
-  marginBottom: "18px",
-};
-
-const searchStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "16px 18px",
-  borderRadius: "16px",
-  border: "1px solid #cfd9e8",
-  fontSize: "15px",
-  boxSizing: "border-box",
-  background: "#fbfdff",
-};
-
-const statRowStyle: React.CSSProperties = {
-  display: "flex",
-  gap: "10px",
-  flexWrap: "wrap",
-  marginTop: "14px",
-};
-
-const pillStyle: React.CSSProperties = {
-  padding: "8px 12px",
-  borderRadius: "999px",
-  background: "#f3f7fc",
-  border: "1px solid #d7e1ee",
-  fontSize: "13px",
-  fontWeight: 800,
-  color: "#35506f",
-};
-
-const gridStyle: React.CSSProperties = {
-  display: "grid",
-  gap: "18px",
-};
-
-const cardStyle: React.CSSProperties = {
-  background: "#ffffff",
-  borderRadius: "22px",
-  padding: "22px",
-  border: "1px solid #d9e3f1",
-  boxShadow: "0 14px 28px rgba(20, 40, 90, 0.08)",
-};
-
-const cardTopStyle: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: "12px",
-  flexWrap: "wrap",
-};
-
-const eventTitleStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: "24px",
-  fontWeight: 900,
-  color: "#12233f",
-};
-
-const badgeRowStyle: React.CSSProperties = {
-  display: "flex",
-  gap: "8px",
-  flexWrap: "wrap",
-};
-
-const badgeStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "8px 12px",
-  borderRadius: "999px",
-  background: "#edf4fb",
-  border: "1px solid #d9e3f1",
-  color: "#173d70",
-  fontWeight: 800,
-  fontSize: "13px",
-};
-
-const infoGridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: "12px",
-  marginTop: "16px",
-};
-
-const infoCardStyle: React.CSSProperties = {
-  border: "1px solid #dde6f2",
-  borderRadius: "16px",
-  padding: "14px",
-  background: "#f8fbff",
-};
-
-const labelStyle: React.CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 900,
-  letterSpacing: "0.05em",
-  textTransform: "uppercase",
-  color: "#6b7c93",
-  marginBottom: "6px",
-};
-
-const valueStyle: React.CSSProperties = {
-  margin: 0,
-  color: "#24364d",
-  lineHeight: 1.55,
-  whiteSpace: "pre-wrap",
-  wordBreak: "break-word",
-};
-
-const sectionStyle: React.CSSProperties = {
-  marginTop: "16px",
-  border: "1px solid #dde6f2",
-  borderRadius: "16px",
-  padding: "14px",
-  background: "#fcfdff",
-};
-
-const listStyle: React.CSSProperties = {
-  margin: "8px 0 0 18px",
-  color: "#24364d",
-  lineHeight: 1.7,
-};
-
-const buttonRowStyle: React.CSSProperties = {
-  display: "flex",
-  gap: "10px",
-  flexWrap: "wrap",
-  marginTop: "16px",
-};
-
-const buttonStyle: React.CSSProperties = {
-  padding: "10px 14px",
-  borderRadius: "12px",
-  border: "1px solid #cdd8e8",
-  background: "#ffffff",
-  cursor: "pointer",
-  fontWeight: 800,
-  color: "#173d70",
-};
-
-const primaryButtonStyle: React.CSSProperties = {
-  ...buttonStyle,
-  background: "#173d70",
-  color: "#ffffff",
-  border: "1px solid #173d70",
-};
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "12px 14px",
-  borderRadius: "12px",
-  border: "1px solid #cfd7e6",
-  fontSize: "14px",
-  boxSizing: "border-box",
-  background: "#ffffff",
-};
-
-const editorGridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: "12px",
-  marginTop: "14px",
-};
-
-function getEventOverrides(): Record<string, EventOverride> {
-  if (typeof window === "undefined") return {};
   try {
-    const raw = window.localStorage.getItem(EVENT_OVERRIDES_STORAGE_KEY);
-    if (!raw) return {};
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(starterEvents));
+      return starterEvents;
+    }
+
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
+    if (!Array.isArray(parsed)) return starterEvents;
+
+    return parsed;
   } catch {
-    return {};
+    return starterEvents;
   }
 }
 
-function saveEventOverrides(data: Record<string, EventOverride>) {
+function saveEvents(events: EventItem[]) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(EVENT_OVERRIDES_STORAGE_KEY, JSON.stringify(data));
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
 }
 
 export default function EventsPage() {
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [flash, setFlash] = useState("");
   const [query, setQuery] = useState("");
-  const [assignments, setAssignments] = useState<AssignmentDraft[]>([]);
-  const [overrides, setOverrides] = useState<Record<string, EventOverride>>({});
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [saveMessage, setSaveMessage] = useState("");
 
-  const [editName, setEditName] = useState("");
-  const [editStatus, setEditStatus] = useState<EventItem["status"]>("Needs SPs");
-  const [editDateText, setEditDateText] = useState("");
-  const [editSpNeeded, setEditSpNeeded] = useState("0");
-  const [editVisibility, setEditVisibility] = useState<EventItem["visibility"]>("Team");
-  const [editLocation, setEditLocation] = useState("");
-  const [editNotes, setEditNotes] = useState("");
-  const [editLeadSimOp, setEditLeadSimOp] = useState("");
-  const [editAssignedStaff, setEditAssignedStaff] = useState("");
-  const [editAssociatedStaff, setEditAssociatedStaff] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newDateText, setNewDateText] = useState("");
+  const [newStatus, setNewStatus] = useState<EventStatus>("Draft");
+  const [newNeeded, setNewNeeded] = useState<number>(0);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Partial<EventItem>>({});
 
   useEffect(() => {
-    setAssignments(getStoredAssignments());
-    setOverrides(getEventOverrides());
-
-    const refresh = () => {
-      setAssignments(getStoredAssignments());
-      setOverrides(getEventOverrides());
-    };
-
-    window.addEventListener("storage", refresh);
-    window.addEventListener("cfsp-assignments-updated", refresh as EventListener);
-
-    return () => {
-      window.removeEventListener("storage", refresh);
-      window.removeEventListener(
-        "cfsp-assignments-updated",
-        refresh as EventListener
-      );
-    };
+    const loadedEvents = loadEvents();
+    setEvents(loadedEvents);
+    setLoaded(true);
   }, []);
 
-  const displayEvents = useMemo<DisplayEvent[]>(() => {
-    return baseEvents.map((baseEvent) => {
-      const merged: EventItem = {
-        ...baseEvent,
-        ...(overrides[baseEvent.id] || {}),
-      };
+  useEffect(() => {
+    if (!loaded) return;
+    saveEvents(events);
+  }, [events, loaded]);
 
-      const baseAssigned = new Set(merged.assignedSPIds || []);
-      const draftMatches = assignments.filter(
-        (item) => item.eventMode === "existing" && item.eventId === merged.id
-      );
+  function showFlash(message: string) {
+    setFlash(message);
+    window.setTimeout(() => {
+      setFlash("");
+    }, 2200);
+  }
 
-      draftMatches.forEach((item) => baseAssigned.add(item.spId));
+  function handleCreateDraft() {
+    const trimmedName = newName.trim();
 
-      const assignedNames = Array.from(baseAssigned).map((spId) => {
-        const found = getSPById(spId);
-        const fallback = draftMatches.find((item) => item.spId === spId)?.spName;
-        return found?.fullName || fallback || spId;
-      });
+    const event: EventItem = {
+      id: uid(),
+      name: trimmedName || "Untitled Event",
+      status: newStatus,
+      date_text: newDateText.trim() || "Date TBD",
+      sp_needed: Number.isFinite(newNeeded) ? Math.max(0, newNeeded) : 0,
+      sp_assigned: 0,
+      notes: "",
+      updated_at: new Date().toISOString(),
+    };
 
-      return {
-        ...merged,
-        spAssigned: assignedNames.length,
-        assignedNames,
-        leadSimOp: merged.leadSimOp ? resolveSimOpName(merged.leadSimOp) : "",
-        assignedStaff: (merged.assignedStaff || []).map(resolveSimOpName),
-        associatedStaff: (merged.associatedStaff || []).map(resolveSimOpName),
-      };
-    });
-  }, [assignments, overrides]);
+    const next = [event, ...events];
+    setEvents(next);
 
-  const placeholderGroups = useMemo(() => {
-    const placeholderAssignments = assignments.filter(
-      (item) => item.eventMode === "placeholder"
-    );
+    setNewName("");
+    setNewDateText("");
+    setNewStatus("Draft");
+    setNewNeeded(0);
 
-    const groups = new Map<
-      string,
-      { eventName: string; dateText: string; assignedNames: string[]; notes: string[] }
-    >();
+    showFlash(`Saved draft: ${event.name}`);
+  }
 
-    placeholderAssignments.forEach((item) => {
-      const key = `${item.eventName}__${item.dateText || ""}`;
-      const existing = groups.get(key);
+  function handleDelete(id: string) {
+    const target = events.find((e) => e.id === id);
+    const next = events.filter((e) => e.id !== id);
+    setEvents(next);
+    if (editingId === id) {
+      setEditingId(null);
+      setEditForm({});
+    }
+    showFlash(target ? `Deleted: ${target.name}` : "Event deleted");
+  }
 
-      if (existing) {
-        if (!existing.assignedNames.includes(item.spName)) {
-          existing.assignedNames.push(item.spName);
-        }
-        if (item.notes) existing.notes.push(item.notes);
-      } else {
-        groups.set(key, {
-          eventName: item.eventName,
-          dateText: item.dateText || "",
-          assignedNames: [item.spName],
-          notes: item.notes ? [item.notes] : [],
-        });
-      }
-    });
-
-    return Array.from(groups.values());
-  }, [assignments]);
-
-  const filteredEvents = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return displayEvents;
-
-    return displayEvents.filter((event) =>
-      [
-        event.name,
-        event.status,
-        event.dateText,
-        event.location,
-        event.notes,
-        event.leadSimOp,
-        ...(event.assignedStaff || []),
-        ...(event.associatedStaff || []),
-        ...event.assignedNames,
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(q)
-    );
-  }, [displayEvents, query]);
-
-  const filteredPlaceholderGroups = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return placeholderGroups;
-
-    return placeholderGroups.filter((item) =>
-      [item.eventName, item.dateText, ...item.assignedNames, ...item.notes]
-        .join(" ")
-        .toLowerCase()
-        .includes(q)
-    );
-  }, [placeholderGroups, query]);
-
-  function startEdit(event: DisplayEvent) {
+  function startEdit(event: EventItem) {
     setEditingId(event.id);
-    setEditName(event.name);
-    setEditStatus(event.status);
-    setEditDateText(event.dateText);
-    setEditSpNeeded(String(event.spNeeded));
-    setEditVisibility(event.visibility);
-    setEditLocation(event.location);
-    setEditNotes(event.notes);
-    setEditLeadSimOp(event.leadSimOp || "");
-    setEditAssignedStaff((event.assignedStaff || []).join(", "));
-    setEditAssociatedStaff((event.associatedStaff || []).join(", "));
+    setEditForm({ ...event });
   }
 
   function cancelEdit() {
     setEditingId(null);
+    setEditForm({});
   }
 
-  function saveEdit(eventId: string) {
-    const nextOverrides = {
-      ...overrides,
-      [eventId]: {
-        name: editName.trim(),
-        status: editStatus,
-        dateText: editDateText.trim(),
-        spNeeded: Number(editSpNeeded) || 0,
-        visibility: editVisibility,
-        location: editLocation.trim(),
-        notes: editNotes.trim(),
-        leadSimOp: editLeadSimOp.trim(),
-        assignedStaff: editAssignedStaff
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
-        associatedStaff: editAssociatedStaff
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
-      },
-    };
+  function saveEdit() {
+    if (!editingId) return;
 
-    setOverrides(nextOverrides);
-    saveEventOverrides(nextOverrides);
+    const next = events.map((event) => {
+      if (event.id !== editingId) return event;
+
+      return {
+        ...event,
+        name: String(editForm.name ?? event.name).trim() || "Untitled Event",
+        status: (editForm.status as EventStatus) ?? event.status,
+        date_text: String(editForm.date_text ?? event.date_text).trim() || "Date TBD",
+        sp_needed: Math.max(0, Number(editForm.sp_needed ?? event.sp_needed) || 0),
+        sp_assigned: Math.max(
+          0,
+          Number(editForm.sp_assigned ?? event.sp_assigned) || 0
+        ),
+        notes: String(editForm.notes ?? event.notes ?? ""),
+        updated_at: new Date().toISOString(),
+      };
+    });
+
+    const savedItem = next.find((e) => e.id === editingId);
+    setEvents(next);
     setEditingId(null);
-    setSaveMessage("Event changes saved.");
-    setTimeout(() => setSaveMessage(""), 1800);
+    setEditForm({});
+    showFlash(savedItem ? `Changes saved: ${savedItem.name}` : "Changes saved");
   }
+
+  function updateEventStatus(id: string, status: EventStatus) {
+    const next = events.map((event) =>
+      event.id === id
+        ? { ...event, status, updated_at: new Date().toISOString() }
+        : event
+    );
+    setEvents(next);
+    const updated = next.find((e) => e.id === id);
+    showFlash(updated ? `Status updated: ${updated.name}` : "Status updated");
+  }
+
+  function saveAssignmentDraft() {
+    saveEvents(events);
+    showFlash("Assignment draft saved");
+  }
+
+  const filteredEvents = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return events;
+
+    return events.filter((event) => {
+      return (
+        event.name.toLowerCase().includes(q) ||
+        event.status.toLowerCase().includes(q) ||
+        event.date_text.toLowerCase().includes(q) ||
+        (event.notes || "").toLowerCase().includes(q)
+      );
+    });
+  }, [events, query]);
+
+  const summary = useMemo(() => {
+    const total = events.length;
+    const needsSPs = events.filter((e) => e.status === "Needs SPs").length;
+    const drafts = events.filter((e) => e.status === "Draft").length;
+    const scheduled = events.filter((e) => e.status === "Scheduled").length;
+    return { total, needsSPs, drafts, scheduled };
+  }, [events]);
 
   return (
-    <div style={pageStyle}>
-      <div style={shellStyle}>
-        <div style={heroStyle}>
-          <div style={heroTopStyle}>
-            <div>
-              <h1 style={titleStyle}>Events</h1>
-              <div style={subtitleStyle}>
-                Edit events, review staffing, and see live SP assignment results.
-              </div>
-            </div>
+    <div style={styles.page}>
+      <div style={styles.topBar}>
+        <div>
+          <h1 style={styles.title}>Events</h1>
+          <p style={styles.subtitle}>
+            Create, save, edit, and manage event drafts from one page.
+          </p>
+        </div>
 
-            <div style={navRowStyle}>
-              <Link href="/admin" style={lightButtonStyle}>
-                Admin
-              </Link>
-              <Link href="/sp-directory" style={lightButtonStyle}>
-                SP Directory
-              </Link>
-              <Link href="/login" style={darkButtonStyle}>
-                Login
-              </Link>
-            </div>
+        <div style={styles.topBarButtons}>
+          <Link href="/" style={styles.linkButton}>
+            Home
+          </Link>
+          <Link href="/dashboard" style={styles.linkButton}>
+            Dashboard
+          </Link>
+          <Link href="/events/new" style={styles.primaryLinkButton}>
+            New Event Page
+          </Link>
+        </div>
+      </div>
+
+      {flash ? <div style={styles.flash}>{flash}</div> : null}
+
+      <div style={styles.summaryRow}>
+        <div style={styles.summaryCard}>
+          <div style={styles.summaryLabel}>Total Events</div>
+          <div style={styles.summaryValue}>{summary.total}</div>
+        </div>
+        <div style={styles.summaryCard}>
+          <div style={styles.summaryLabel}>Drafts</div>
+          <div style={styles.summaryValue}>{summary.drafts}</div>
+        </div>
+        <div style={styles.summaryCard}>
+          <div style={styles.summaryLabel}>Need SPs</div>
+          <div style={styles.summaryValue}>{summary.needsSPs}</div>
+        </div>
+        <div style={styles.summaryCard}>
+          <div style={styles.summaryLabel}>Scheduled</div>
+          <div style={styles.summaryValue}>{summary.scheduled}</div>
+        </div>
+      </div>
+
+      <div style={styles.createCard}>
+        <h2 style={styles.sectionTitle}>Quick Draft Event</h2>
+
+        <div style={styles.formGrid}>
+          <div style={styles.field}>
+            <label style={styles.label}>Event Name</label>
+            <input
+              style={styles.input}
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Example: PA/SPL IPE Virtual"
+            />
+          </div>
+
+          <div style={styles.field}>
+            <label style={styles.label}>Date Text</label>
+            <input
+              style={styles.input}
+              value={newDateText}
+              onChange={(e) => setNewDateText(e.target.value)}
+              placeholder="Example: Apr 15, Apr 21"
+            />
+          </div>
+
+          <div style={styles.field}>
+            <label style={styles.label}>Status</label>
+            <select
+              style={styles.input}
+              value={newStatus}
+              onChange={(e) => setNewStatus(e.target.value as EventStatus)}
+            >
+              {statuses.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={styles.field}>
+            <label style={styles.label}>SPs Needed</label>
+            <input
+              style={styles.input}
+              type="number"
+              min={0}
+              value={newNeeded}
+              onChange={(e) => setNewNeeded(Number(e.target.value))}
+            />
           </div>
         </div>
 
-        <div style={toolbarStyle}>
-          <input
-            type="text"
-            placeholder="Search by event, staff, assigned SP, status, notes..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            style={searchStyle}
-          />
-
-          <div style={statRowStyle}>
-            <span style={pillStyle}>Base Events: {baseEvents.length}</span>
-            <span style={pillStyle}>Assignment Drafts: {assignments.length}</span>
-            <span style={pillStyle}>Placeholder Events: {placeholderGroups.length}</span>
-          </div>
+        <div style={styles.rowButtons}>
+          <button style={styles.primaryButton} onClick={handleCreateDraft}>
+            Save Event Draft
+          </button>
+          <button style={styles.secondaryButton} onClick={saveAssignmentDraft}>
+            Save Assignment Draft
+          </button>
         </div>
+      </div>
 
-        {saveMessage ? (
-          <div style={{ ...cardStyle, marginBottom: "16px" }}>{saveMessage}</div>
-        ) : null}
+      <div style={styles.listTopRow}>
+        <h2 style={styles.sectionTitle}>All Events</h2>
+        <input
+          style={styles.search}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search events..."
+        />
+      </div>
 
-        <div style={gridStyle}>
-          {filteredEvents.map((event) => (
-            <div key={event.id} style={cardStyle}>
-              <div style={cardTopStyle}>
-                <h2 style={eventTitleStyle}>{event.name}</h2>
+      <div style={styles.list}>
+        {filteredEvents.length === 0 ? (
+          <div style={styles.emptyState}>
+            No events found. Create one above and it will save on this device.
+          </div>
+        ) : (
+          filteredEvents.map((event) => {
+            const isEditing = editingId === event.id;
 
-                <div style={badgeRowStyle}>
-                  <div style={badgeStyle}>{event.status}</div>
-                  <div style={badgeStyle}>
-                    {event.spAssigned} / {event.spNeeded} SPs
-                  </div>
-                  <div style={badgeStyle}>{event.location}</div>
-                </div>
-              </div>
+            return (
+              <div key={event.id} style={styles.card}>
+                {!isEditing ? (
+                  <>
+                    <div style={styles.cardHeader}>
+                      <div>
+                        <h3 style={styles.cardTitle}>{event.name}</h3>
+                        <div style={styles.cardMeta}>
+                          Last updated:{" "}
+                          {new Date(event.updated_at).toLocaleString()}
+                        </div>
+                      </div>
 
-              <div style={infoGridStyle}>
-                <div style={infoCardStyle}>
-                  <div style={labelStyle}>Date</div>
-                  <p style={valueStyle}>{event.dateText}</p>
-                </div>
+                      <div style={styles.badgeWrap}>
+                        <span style={styles.badge}>{event.status}</span>
+                      </div>
+                    </div>
 
-                <div style={infoCardStyle}>
-                  <div style={labelStyle}>Lead Sim Op</div>
-                  <p style={valueStyle}>{event.leadSimOp || "—"}</p>
-                </div>
+                    <div style={styles.cardBody}>
+                      <div style={styles.infoRow}>
+                        <span style={styles.infoLabel}>Dates</span>
+                        <span>{event.date_text}</span>
+                      </div>
+                      <div style={styles.infoRow}>
+                        <span style={styles.infoLabel}>SP Coverage</span>
+                        <span>
+                          {event.sp_assigned} / {event.sp_needed}
+                        </span>
+                      </div>
+                      <div style={styles.infoRow}>
+                        <span style={styles.infoLabel}>Notes</span>
+                        <span>{event.notes || "—"}</span>
+                      </div>
+                    </div>
 
-                <div style={infoCardStyle}>
-                  <div style={labelStyle}>Assigned Staff</div>
-                  <p style={valueStyle}>
-                    {event.assignedStaff?.length ? event.assignedStaff.join(", ") : "—"}
-                  </p>
-                </div>
+                    <div style={styles.cardActions}>
+                      <Link href={`/events/${event.id}`} style={styles.linkButton}>
+                        View
+                      </Link>
 
-                <div style={infoCardStyle}>
-                  <div style={labelStyle}>Associated Staff</div>
-                  <p style={valueStyle}>
-                    {event.associatedStaff?.length
-                      ? event.associatedStaff.join(", ")
-                      : "—"}
-                  </p>
-                </div>
-              </div>
+                      <button
+                        style={styles.secondaryButton}
+                        onClick={() => startEdit(event)}
+                      >
+                        Edit
+                      </button>
 
-              <div style={sectionStyle}>
-                <div style={labelStyle}>Assigned SPs</div>
-                {event.assignedNames.length ? (
-                  <ul style={listStyle}>
-                    {event.assignedNames.map((name) => (
-                      <li key={`${event.id}-${name}`}>{name}</li>
-                    ))}
-                  </ul>
+                      <select
+                        style={styles.statusSelect}
+                        value={event.status}
+                        onChange={(e) =>
+                          updateEventStatus(event.id, e.target.value as EventStatus)
+                        }
+                      >
+                        {statuses.map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+
+                      <button
+                        style={styles.dangerButton}
+                        onClick={() => handleDelete(event.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </>
                 ) : (
-                  <p style={valueStyle}>No SPs assigned yet.</p>
+                  <>
+                    <div style={styles.cardHeader}>
+                      <h3 style={styles.cardTitle}>Edit Event</h3>
+                    </div>
+
+                    <div style={styles.formGrid}>
+                      <div style={styles.field}>
+                        <label style={styles.label}>Event Name</label>
+                        <input
+                          style={styles.input}
+                          value={String(editForm.name ?? "")}
+                          onChange={(e) =>
+                            setEditForm((prev) => ({
+                              ...prev,
+                              name: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+
+                      <div style={styles.field}>
+                        <label style={styles.label}>Date Text</label>
+                        <input
+                          style={styles.input}
+                          value={String(editForm.date_text ?? "")}
+                          onChange={(e) =>
+                            setEditForm((prev) => ({
+                              ...prev,
+                              date_text: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+
+                      <div style={styles.field}>
+                        <label style={styles.label}>Status</label>
+                        <select
+                          style={styles.input}
+                          value={String(editForm.status ?? "Draft")}
+                          onChange={(e) =>
+                            setEditForm((prev) => ({
+                              ...prev,
+                              status: e.target.value as EventStatus,
+                            }))
+                          }
+                        >
+                          {statuses.map((status) => (
+                            <option key={status} value={status}>
+                              {status}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div style={styles.field}>
+                        <label style={styles.label}>SPs Needed</label>
+                        <input
+                          style={styles.input}
+                          type="number"
+                          min={0}
+                          value={Number(editForm.sp_needed ?? 0)}
+                          onChange={(e) =>
+                            setEditForm((prev) => ({
+                              ...prev,
+                              sp_needed: Number(e.target.value),
+                            }))
+                          }
+                        />
+                      </div>
+
+                      <div style={styles.field}>
+                        <label style={styles.label}>SPs Assigned</label>
+                        <input
+                          style={styles.input}
+                          type="number"
+                          min={0}
+                          value={Number(editForm.sp_assigned ?? 0)}
+                          onChange={(e) =>
+                            setEditForm((prev) => ({
+                              ...prev,
+                              sp_assigned: Number(e.target.value),
+                            }))
+                          }
+                        />
+                      </div>
+
+                      <div style={{ ...styles.field, gridColumn: "1 / -1" }}>
+                        <label style={styles.label}>Notes</label>
+                        <textarea
+                          style={styles.textarea}
+                          value={String(editForm.notes ?? "")}
+                          onChange={(e) =>
+                            setEditForm((prev) => ({
+                              ...prev,
+                              notes: e.target.value,
+                            }))
+                          }
+                          placeholder="Optional notes"
+                        />
+                      </div>
+                    </div>
+
+                    <div style={styles.cardActions}>
+                      <button style={styles.primaryButton} onClick={saveEdit}>
+                        Save Changes
+                      </button>
+                      <button style={styles.secondaryButton} onClick={cancelEdit}>
+                        Cancel
+                      </button>
+                    </div>
+                  </>
                 )}
               </div>
-
-              <div style={sectionStyle}>
-                <div style={labelStyle}>Notes</div>
-                <p style={valueStyle}>{event.notes || "—"}</p>
-              </div>
-
-              <div style={buttonRowStyle}>
-                <button type="button" style={buttonStyle} onClick={() => startEdit(event)}>
-                  Edit Event
-                </button>
-              </div>
-
-              {editingId === event.id ? (
-                <div style={sectionStyle}>
-                  <div style={labelStyle}>Edit Event</div>
-
-                  <div style={editorGridStyle}>
-                    <input
-                      style={inputStyle}
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      placeholder="Event name"
-                    />
-
-                    <select
-                      style={inputStyle}
-                      value={editStatus}
-                      onChange={(e) => setEditStatus(e.target.value as EventItem["status"])}
-                    >
-                      <option>Needs SPs</option>
-                      <option>Scheduled</option>
-                      <option>In Progress</option>
-                      <option>Complete</option>
-                    </select>
-
-                    <input
-                      style={inputStyle}
-                      value={editDateText}
-                      onChange={(e) => setEditDateText(e.target.value)}
-                      placeholder="Date text"
-                    />
-
-                    <input
-                      style={inputStyle}
-                      value={editSpNeeded}
-                      onChange={(e) => setEditSpNeeded(e.target.value)}
-                      placeholder="SP needed"
-                    />
-
-                    <select
-                      style={inputStyle}
-                      value={editVisibility}
-                      onChange={(e) =>
-                        setEditVisibility(e.target.value as EventItem["visibility"])
-                      }
-                    >
-                      <option>Team</option>
-                      <option>Personal</option>
-                    </select>
-
-                    <input
-                      style={inputStyle}
-                      value={editLocation}
-                      onChange={(e) => setEditLocation(e.target.value)}
-                      placeholder="Location"
-                    />
-
-                    <input
-                      style={inputStyle}
-                      value={editLeadSimOp}
-                      onChange={(e) => setEditLeadSimOp(e.target.value)}
-                      placeholder="Lead Sim Op"
-                    />
-
-                    <input
-                      style={inputStyle}
-                      value={editAssignedStaff}
-                      onChange={(e) => setEditAssignedStaff(e.target.value)}
-                      placeholder="Assigned staff, comma separated"
-                    />
-
-                    <input
-                      style={inputStyle}
-                      value={editAssociatedStaff}
-                      onChange={(e) => setEditAssociatedStaff(e.target.value)}
-                      placeholder="Associated staff, comma separated"
-                    />
-                  </div>
-
-                  <div style={{ marginTop: "12px" }}>
-                    <textarea
-                      style={{ ...inputStyle, minHeight: "110px", resize: "vertical" }}
-                      value={editNotes}
-                      onChange={(e) => setEditNotes(e.target.value)}
-                      placeholder="Event notes"
-                    />
-                  </div>
-
-                  <div style={buttonRowStyle}>
-                    <button
-                      type="button"
-                      style={primaryButtonStyle}
-                      onClick={() => saveEdit(event.id)}
-                    >
-                      Save Event Changes
-                    </button>
-
-                    <button type="button" style={buttonStyle} onClick={cancelEdit}>
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          ))}
-
-          {filteredPlaceholderGroups.map((item) => (
-            <div key={`${item.eventName}-${item.dateText}`} style={cardStyle}>
-              <div style={cardTopStyle}>
-                <h2 style={eventTitleStyle}>{item.eventName}</h2>
-
-                <div style={badgeRowStyle}>
-                  <div style={badgeStyle}>Placeholder</div>
-                  <div style={badgeStyle}>{item.dateText || "Date TBD"}</div>
-                  <div style={badgeStyle}>{item.assignedNames.length} SPs</div>
-                </div>
-              </div>
-
-              <div style={sectionStyle}>
-                <div style={labelStyle}>Assigned SPs</div>
-                <ul style={listStyle}>
-                  {item.assignedNames.map((name) => (
-                    <li key={`${item.eventName}-${name}`}>{name}</li>
-                  ))}
-                </ul>
-              </div>
-
-              {item.notes.length ? (
-                <div style={sectionStyle}>
-                  <div style={labelStyle}>Notes</div>
-                  <ul style={listStyle}>
-                    {item.notes.map((note, index) => (
-                      <li key={`${item.eventName}-note-${index}`}>{note}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </div>
-          ))}
-        </div>
+            );
+          })
+        )}
       </div>
     </div>
   );
 }
+
+const styles: Record<string, React.CSSProperties> = {
+  page: {
+    minHeight: "100vh",
+    background: "#f4f7fb",
+    padding: "32px 20px 60px",
+  },
+  topBar: {
+    maxWidth: "1200px",
+    margin: "0 auto 20px auto",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: "16px",
+    flexWrap: "wrap",
+  },
+  title: {
+    margin: 0,
+    fontSize: "32px",
+    fontWeight: 800,
+    color: "#183153",
+  },
+  subtitle: {
+    margin: "8px 0 0 0",
+    color: "#516273",
+    fontSize: "15px",
+  },
+  topBarButtons: {
+    display: "flex",
+    gap: "10px",
+    flexWrap: "wrap",
+  },
+  linkButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "10px 14px",
+    borderRadius: "10px",
+    textDecoration: "none",
+    background: "#ffffff",
+    color: "#183153",
+    border: "1px solid #d8e0ec",
+    fontWeight: 600,
+  },
+  primaryLinkButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "10px 14px",
+    borderRadius: "10px",
+    textDecoration: "none",
+    background: "#1d4ed8",
+    color: "#ffffff",
+    border: "1px solid #1d4ed8",
+    fontWeight: 700,
+  },
+  flash: {
+    maxWidth: "1200px",
+    margin: "0 auto 18px auto",
+    background: "#dcfce7",
+    color: "#166534",
+    border: "1px solid #bbf7d0",
+    borderRadius: "12px",
+    padding: "12px 14px",
+    fontWeight: 700,
+  },
+  summaryRow: {
+    maxWidth: "1200px",
+    margin: "0 auto 20px auto",
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+    gap: "14px",
+  },
+  summaryCard: {
+    background: "#ffffff",
+    border: "1px solid #d8e0ec",
+    borderRadius: "16px",
+    padding: "18px",
+    boxShadow: "0 4px 16px rgba(19, 40, 72, 0.05)",
+  },
+  summaryLabel: {
+    color: "#5f7183",
+    fontSize: "13px",
+    marginBottom: "8px",
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+  },
+  summaryValue: {
+    color: "#183153",
+    fontSize: "28px",
+    fontWeight: 800,
+  },
+  createCard: {
+    maxWidth: "1200px",
+    margin: "0 auto 22px auto",
+    background: "#ffffff",
+    border: "1px solid #d8e0ec",
+    borderRadius: "18px",
+    padding: "22px",
+    boxShadow: "0 4px 16px rgba(19, 40, 72, 0.05)",
+  },
+  sectionTitle: {
+    margin: "0 0 16px 0",
+    fontSize: "22px",
+    color: "#183153",
+    fontWeight: 800,
+  },
+  formGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: "14px",
+  },
+  field: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+  },
+  label: {
+    fontSize: "14px",
+    fontWeight: 700,
+    color: "#334155",
+  },
+  input: {
+    height: "42px",
+    borderRadius: "10px",
+    border: "1px solid #cfd8e3",
+    padding: "0 12px",
+    fontSize: "14px",
+    background: "#fff",
+  },
+  textarea: {
+    minHeight: "100px",
+    borderRadius: "10px",
+    border: "1px solid #cfd8e3",
+    padding: "12px",
+    fontSize: "14px",
+    background: "#fff",
+    resize: "vertical",
+  },
+  rowButtons: {
+    display: "flex",
+    gap: "10px",
+    flexWrap: "wrap",
+    marginTop: "18px",
+  },
+  primaryButton: {
+    background: "#1d4ed8",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "10px",
+    padding: "11px 16px",
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  secondaryButton: {
+    background: "#ffffff",
+    color: "#183153",
+    border: "1px solid #cfd8e3",
+    borderRadius: "10px",
+    padding: "11px 16px",
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  dangerButton: {
+    background: "#dc2626",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "10px",
+    padding: "11px 16px",
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  listTopRow: {
+    maxWidth: "1200px",
+    margin: "0 auto 14px auto",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "12px",
+    flexWrap: "wrap",
+  },
+  search: {
+    width: "280px",
+    maxWidth: "100%",
+    height: "42px",
+    borderRadius: "10px",
+    border: "1px solid #cfd8e3",
+    padding: "0 12px",
+    fontSize: "14px",
+    background: "#fff",
+  },
+  list: {
+    maxWidth: "1200px",
+    margin: "0 auto",
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
+    gap: "16px",
+  },
+  emptyState: {
+    gridColumn: "1 / -1",
+    background: "#ffffff",
+    border: "1px dashed #cfd8e3",
+    borderRadius: "18px",
+    padding: "28px",
+    color: "#5f7183",
+    textAlign: "center",
+    fontWeight: 600,
+  },
+  card: {
+    background: "#ffffff",
+    border: "1px solid #d8e0ec",
+    borderRadius: "18px",
+    padding: "18px",
+    boxShadow: "0 4px 16px rgba(19, 40, 72, 0.05)",
+  },
+  cardHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: "12px",
+    marginBottom: "12px",
+  },
+  cardTitle: {
+    margin: 0,
+    fontSize: "20px",
+    fontWeight: 800,
+    color: "#183153",
+  },
+  cardMeta: {
+    marginTop: "6px",
+    color: "#64748b",
+    fontSize: "12px",
+  },
+  badgeWrap: {
+    flexShrink: 0,
+  },
+  badge: {
+    display: "inline-block",
+    padding: "8px 10px",
+    borderRadius: "999px",
+    background: "#eff6ff",
+    color: "#1d4ed8",
+    fontSize: "12px",
+    fontWeight: 800,
+    border: "1px solid #bfdbfe",
+  },
+  cardBody: {
+    display: "grid",
+    gap: "10px",
+    marginBottom: "16px",
+  },
+  infoRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "16px",
+    fontSize: "14px",
+    color: "#334155",
+  },
+  infoLabel: {
+    fontWeight: 700,
+    color: "#5f7183",
+  },
+  cardActions: {
+    display: "flex",
+    gap: "10px",
+    flexWrap: "wrap",
+    alignItems: "center",
+  },
+  statusSelect: {
+    height: "42px",
+    borderRadius: "10px",
+    border: "1px solid #cfd8e3",
+    padding: "0 12px",
+    fontSize: "14px",
+    background: "#fff",
+  },
+};
