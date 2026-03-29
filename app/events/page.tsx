@@ -11,6 +11,28 @@ import {
   resolveSimOpName,
 } from "../lib/mockData";
 
+const EVENT_OVERRIDES_STORAGE_KEY = "cfsp_event_overrides";
+
+type EventOverride = Partial<
+  Pick<
+    EventItem,
+    | "name"
+    | "status"
+    | "dateText"
+    | "spNeeded"
+    | "visibility"
+    | "location"
+    | "notes"
+    | "leadSimOp"
+    | "assignedStaff"
+    | "associatedStaff"
+  >
+>;
+
+type DisplayEvent = EventItem & {
+  assignedNames: string[];
+};
+
 const pageStyle: React.CSSProperties = {
   minHeight: "100vh",
   background: "linear-gradient(135deg, #edf4fb 0%, #dfeaf7 100%)",
@@ -196,7 +218,7 @@ const valueStyle: React.CSSProperties = {
   wordBreak: "break-word",
 };
 
-const assignmentListStyle: React.CSSProperties = {
+const sectionStyle: React.CSSProperties = {
   marginTop: "16px",
   border: "1px solid #dde6f2",
   borderRadius: "16px",
@@ -210,58 +232,143 @@ const listStyle: React.CSSProperties = {
   lineHeight: 1.7,
 };
 
-type DisplayEvent = EventItem & {
-  assignedNames: string[];
+const buttonRowStyle: React.CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  marginTop: "16px",
 };
 
-type PlaceholderGroup = {
-  eventName: string;
-  dateText: string;
-  assignedNames: string[];
-  notes: string[];
+const buttonStyle: React.CSSProperties = {
+  padding: "10px 14px",
+  borderRadius: "12px",
+  border: "1px solid #cdd8e8",
+  background: "#ffffff",
+  cursor: "pointer",
+  fontWeight: 800,
+  color: "#173d70",
 };
+
+const primaryButtonStyle: React.CSSProperties = {
+  ...buttonStyle,
+  background: "#173d70",
+  color: "#ffffff",
+  border: "1px solid #173d70",
+};
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "12px 14px",
+  borderRadius: "12px",
+  border: "1px solid #cfd7e6",
+  fontSize: "14px",
+  boxSizing: "border-box",
+  background: "#ffffff",
+};
+
+const editorGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: "12px",
+  marginTop: "14px",
+};
+
+function getEventOverrides(): Record<string, EventOverride> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(EVENT_OVERRIDES_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveEventOverrides(data: Record<string, EventOverride>) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(EVENT_OVERRIDES_STORAGE_KEY, JSON.stringify(data));
+}
 
 export default function EventsPage() {
   const [query, setQuery] = useState("");
   const [assignments, setAssignments] = useState<AssignmentDraft[]>([]);
+  const [overrides, setOverrides] = useState<Record<string, EventOverride>>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState("");
+
+  const [editName, setEditName] = useState("");
+  const [editStatus, setEditStatus] = useState<EventItem["status"]>("Needs SPs");
+  const [editDateText, setEditDateText] = useState("");
+  const [editSpNeeded, setEditSpNeeded] = useState("0");
+  const [editVisibility, setEditVisibility] = useState<EventItem["visibility"]>("Team");
+  const [editLocation, setEditLocation] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [editLeadSimOp, setEditLeadSimOp] = useState("");
+  const [editAssignedStaff, setEditAssignedStaff] = useState("");
+  const [editAssociatedStaff, setEditAssociatedStaff] = useState("");
 
   useEffect(() => {
     setAssignments(getStoredAssignments());
+    setOverrides(getEventOverrides());
+
+    const refresh = () => {
+      setAssignments(getStoredAssignments());
+      setOverrides(getEventOverrides());
+    };
+
+    window.addEventListener("storage", refresh);
+    window.addEventListener("cfsp-assignments-updated", refresh as EventListener);
+
+    return () => {
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener(
+        "cfsp-assignments-updated",
+        refresh as EventListener
+      );
+    };
   }, []);
 
   const displayEvents = useMemo<DisplayEvent[]>(() => {
-    return baseEvents.map((event) => {
-      const baseAssigned = new Set(event.assignedSPIds || []);
+    return baseEvents.map((baseEvent) => {
+      const merged: EventItem = {
+        ...baseEvent,
+        ...(overrides[baseEvent.id] || {}),
+      };
 
+      const baseAssigned = new Set(merged.assignedSPIds || []);
       const draftMatches = assignments.filter(
-        (item) => item.eventMode === "existing" && item.eventId === event.id
+        (item) => item.eventMode === "existing" && item.eventId === merged.id
       );
 
       draftMatches.forEach((item) => baseAssigned.add(item.spId));
 
       const assignedNames = Array.from(baseAssigned).map((spId) => {
         const found = getSPById(spId);
-        const draftName = draftMatches.find((item) => item.spId === spId)?.spName;
-        return found?.fullName || draftName || spId;
+        const fallback = draftMatches.find((item) => item.spId === spId)?.spName;
+        return found?.fullName || fallback || spId;
       });
 
       return {
-        ...event,
+        ...merged,
         spAssigned: assignedNames.length,
         assignedNames,
-        leadSimOp: event.leadSimOp ? resolveSimOpName(event.leadSimOp) : "",
-        assignedStaff: (event.assignedStaff || []).map(resolveSimOpName),
-        associatedStaff: (event.associatedStaff || []).map(resolveSimOpName),
+        leadSimOp: merged.leadSimOp ? resolveSimOpName(merged.leadSimOp) : "",
+        assignedStaff: (merged.assignedStaff || []).map(resolveSimOpName),
+        associatedStaff: (merged.associatedStaff || []).map(resolveSimOpName),
       };
     });
-  }, [assignments]);
+  }, [assignments, overrides]);
 
-  const placeholderGroups = useMemo<PlaceholderGroup[]>(() => {
+  const placeholderGroups = useMemo(() => {
     const placeholderAssignments = assignments.filter(
       (item) => item.eventMode === "placeholder"
     );
 
-    const groups = new Map<string, PlaceholderGroup>();
+    const groups = new Map<
+      string,
+      { eventName: string; dateText: string; assignedNames: string[]; notes: string[] }
+    >();
 
     placeholderAssignments.forEach((item) => {
       const key = `${item.eventName}__${item.dateText || ""}`;
@@ -319,6 +426,54 @@ export default function EventsPage() {
     );
   }, [placeholderGroups, query]);
 
+  function startEdit(event: DisplayEvent) {
+    setEditingId(event.id);
+    setEditName(event.name);
+    setEditStatus(event.status);
+    setEditDateText(event.dateText);
+    setEditSpNeeded(String(event.spNeeded));
+    setEditVisibility(event.visibility);
+    setEditLocation(event.location);
+    setEditNotes(event.notes);
+    setEditLeadSimOp(event.leadSimOp || "");
+    setEditAssignedStaff((event.assignedStaff || []).join(", "));
+    setEditAssociatedStaff((event.associatedStaff || []).join(", "));
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+  }
+
+  function saveEdit(eventId: string) {
+    const nextOverrides = {
+      ...overrides,
+      [eventId]: {
+        name: editName.trim(),
+        status: editStatus,
+        dateText: editDateText.trim(),
+        spNeeded: Number(editSpNeeded) || 0,
+        visibility: editVisibility,
+        location: editLocation.trim(),
+        notes: editNotes.trim(),
+        leadSimOp: editLeadSimOp.trim(),
+        assignedStaff: editAssignedStaff
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        associatedStaff: editAssociatedStaff
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      },
+    };
+
+    setOverrides(nextOverrides);
+    saveEventOverrides(nextOverrides);
+    setEditingId(null);
+    setSaveMessage("Event changes saved.");
+    setTimeout(() => setSaveMessage(""), 1800);
+  }
+
   return (
     <div style={pageStyle}>
       <div style={shellStyle}>
@@ -327,7 +482,7 @@ export default function EventsPage() {
             <div>
               <h1 style={titleStyle}>Events</h1>
               <div style={subtitleStyle}>
-                Live event view with SP assignments pulled into the roster.
+                Edit events, review staffing, and see live SP assignment results.
               </div>
             </div>
 
@@ -361,6 +516,10 @@ export default function EventsPage() {
           </div>
         </div>
 
+        {saveMessage ? (
+          <div style={{ ...cardStyle, marginBottom: "16px" }}>{saveMessage}</div>
+        ) : null}
+
         <div style={gridStyle}>
           {filteredEvents.map((event) => (
             <div key={event.id} style={cardStyle}>
@@ -390,9 +549,7 @@ export default function EventsPage() {
                 <div style={infoCardStyle}>
                   <div style={labelStyle}>Assigned Staff</div>
                   <p style={valueStyle}>
-                    {event.assignedStaff?.length
-                      ? event.assignedStaff.join(", ")
-                      : "—"}
+                    {event.assignedStaff?.length ? event.assignedStaff.join(", ") : "—"}
                   </p>
                 </div>
 
@@ -406,7 +563,7 @@ export default function EventsPage() {
                 </div>
               </div>
 
-              <div style={assignmentListStyle}>
+              <div style={sectionStyle}>
                 <div style={labelStyle}>Assigned SPs</div>
                 {event.assignedNames.length ? (
                   <ul style={listStyle}>
@@ -419,10 +576,118 @@ export default function EventsPage() {
                 )}
               </div>
 
-              <div style={assignmentListStyle}>
+              <div style={sectionStyle}>
                 <div style={labelStyle}>Notes</div>
                 <p style={valueStyle}>{event.notes || "—"}</p>
               </div>
+
+              <div style={buttonRowStyle}>
+                <button type="button" style={buttonStyle} onClick={() => startEdit(event)}>
+                  Edit Event
+                </button>
+              </div>
+
+              {editingId === event.id ? (
+                <div style={sectionStyle}>
+                  <div style={labelStyle}>Edit Event</div>
+
+                  <div style={editorGridStyle}>
+                    <input
+                      style={inputStyle}
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      placeholder="Event name"
+                    />
+
+                    <select
+                      style={inputStyle}
+                      value={editStatus}
+                      onChange={(e) => setEditStatus(e.target.value as EventItem["status"])}
+                    >
+                      <option>Needs SPs</option>
+                      <option>Scheduled</option>
+                      <option>In Progress</option>
+                      <option>Complete</option>
+                    </select>
+
+                    <input
+                      style={inputStyle}
+                      value={editDateText}
+                      onChange={(e) => setEditDateText(e.target.value)}
+                      placeholder="Date text"
+                    />
+
+                    <input
+                      style={inputStyle}
+                      value={editSpNeeded}
+                      onChange={(e) => setEditSpNeeded(e.target.value)}
+                      placeholder="SP needed"
+                    />
+
+                    <select
+                      style={inputStyle}
+                      value={editVisibility}
+                      onChange={(e) =>
+                        setEditVisibility(e.target.value as EventItem["visibility"])
+                      }
+                    >
+                      <option>Team</option>
+                      <option>Personal</option>
+                    </select>
+
+                    <input
+                      style={inputStyle}
+                      value={editLocation}
+                      onChange={(e) => setEditLocation(e.target.value)}
+                      placeholder="Location"
+                    />
+
+                    <input
+                      style={inputStyle}
+                      value={editLeadSimOp}
+                      onChange={(e) => setEditLeadSimOp(e.target.value)}
+                      placeholder="Lead Sim Op"
+                    />
+
+                    <input
+                      style={inputStyle}
+                      value={editAssignedStaff}
+                      onChange={(e) => setEditAssignedStaff(e.target.value)}
+                      placeholder="Assigned staff, comma separated"
+                    />
+
+                    <input
+                      style={inputStyle}
+                      value={editAssociatedStaff}
+                      onChange={(e) => setEditAssociatedStaff(e.target.value)}
+                      placeholder="Associated staff, comma separated"
+                    />
+                  </div>
+
+                  <div style={{ marginTop: "12px" }}>
+                    <textarea
+                      style={{ ...inputStyle, minHeight: "110px", resize: "vertical" }}
+                      value={editNotes}
+                      onChange={(e) => setEditNotes(e.target.value)}
+                      placeholder="Event notes"
+                    />
+                  </div>
+
+                  <div style={buttonRowStyle}>
+                    <button
+                      type="button"
+                      style={primaryButtonStyle}
+                      onClick={() => saveEdit(event.id)}
+                    >
+                      Save Event Changes
+                    </button>
+
+                    <button type="button" style={buttonStyle} onClick={cancelEdit}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           ))}
 
@@ -438,7 +703,7 @@ export default function EventsPage() {
                 </div>
               </div>
 
-              <div style={assignmentListStyle}>
+              <div style={sectionStyle}>
                 <div style={labelStyle}>Assigned SPs</div>
                 <ul style={listStyle}>
                   {item.assignedNames.map((name) => (
@@ -448,7 +713,7 @@ export default function EventsPage() {
               </div>
 
               {item.notes.length ? (
-                <div style={assignmentListStyle}>
+                <div style={sectionStyle}>
                   <div style={labelStyle}>Notes</div>
                   <ul style={listStyle}>
                     {item.notes.map((note, index) => (

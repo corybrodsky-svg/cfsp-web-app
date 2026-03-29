@@ -536,7 +536,7 @@ export default function SPDirectoryPage() {
     return assignments.filter((item) => item.spId === spId).length;
   }
 
-  function saveAssignment(sp: DirectorySP) {
+    function saveAssignment(sp: DirectorySP) {
     if (assignMode === "placeholder" && !placeholderName.trim()) {
       setSavedMessage("Placeholder event name is required.");
       setTimeout(() => setSavedMessage(""), 2200);
@@ -566,12 +566,12 @@ export default function SPDirectoryPage() {
     const next = addOrReplaceAssignment(draft);
     setAssignments(next);
     setSavedMessage(`${sp.fullName} assigned to ${draft.eventName}.`);
+    window.dispatchEvent(new Event("cfsp-assignments-updated"));
     setAssignmentNote("");
     setPlaceholderName("");
     setPlaceholderDate("");
     setTimeout(() => setSavedMessage(""), 2200);
   }
-
   return (
     <div style={pageStyle}>
       <div style={shellStyle}>
