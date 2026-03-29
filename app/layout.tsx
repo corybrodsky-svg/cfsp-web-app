@@ -85,49 +85,63 @@ export default function RootLayout({
               flexWrap: "wrap",
             }}
           >
-            <Link
-              href="/dashboard"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 18,
-                textDecoration: "none",
-                minWidth: 0,
-              }}
-            >
-              <img
-                src="/logo.png"
-                alt="Conflict-Free SP"
-                style={{
-                  height: 64,
-                  width: "auto",
-                  display: "block",
-                  objectFit: "contain",
-                }}
-              />
-              <div>
-                <div
-                  style={{
-                    fontSize: 22,
-                    fontWeight: 900,
-                    color: colors.navy,
-                    lineHeight: 1.05,
-                  }}
-                >
-                  Conflict-Free SP
-                </div>
-                <div
-                  style={{
-                    fontSize: 14,
-                    color: colors.muted,
-                    marginTop: 4,
-                    fontWeight: 600,
-                  }}
-                >
-                  Simulation Scheduling Platform
-                </div>
-              </div>
-            </Link>
+           <Link
+  href="/dashboard"
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: 18,
+    textDecoration: "none",
+    minWidth: 0,
+  }}
+>
+  <div
+    style={{
+      height: 64,
+      width: 240,
+      display: "flex",
+      alignItems: "center",
+      overflow: "hidden",
+      flexShrink: 0,
+    }}
+  >
+    <img
+      src="/logo.png"
+      alt="Conflict-Free SP"
+      style={{
+        maxHeight: "100%",
+        maxWidth: "100%",
+        width: "auto",
+        height: "auto",
+        display: "block",
+        objectFit: "contain",
+      }}
+    />
+  </div>
+
+  <div>
+    <div
+      style={{
+        fontSize: 22,
+        fontWeight: 900,
+        color: "#12376b",
+        lineHeight: 1.05,
+      }}
+    >
+      Conflict-Free SP
+    </div>
+    <div
+      style={{
+        fontSize: 14,
+        color: "#61748e",
+        marginTop: 4,
+        fontWeight: 600,
+      }}
+    >
+      Simulation Scheduling Platform
+    </div>
+  </div>
+</Link>
 
             <nav
               style={{
