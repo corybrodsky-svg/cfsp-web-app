@@ -1,256 +1,251 @@
 "use client";
 
-import { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { supabase } from "../../lib/supabaseClient";
 
-const STATUSES = ["Needs SPs", "Scheduled", "In Progress", "Complete"];
-const VISIBILITIES = ["team", "personal"];
+const pageStyle: React.CSSProperties = {
+  minHeight: "100vh",
+  background:
+    "linear-gradient(135deg, #f4f7fb 0%, #e8eef7 45%, #dfe8f5 100%)",
+  padding: "28px",
+};
 
-function parseNumber(value: string) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.floor(n));
-}
+const shellStyle: React.CSSProperties = {
+  maxWidth: "1000px",
+  margin: "0 auto",
+};
+
+const headerStyle: React.CSSProperties = {
+  marginBottom: "22px",
+};
+
+const titleStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: "28px",
+  fontWeight: 800,
+  color: "#12233f",
+};
+
+const subtitleStyle: React.CSSProperties = {
+  marginTop: "6px",
+  color: "#62748d",
+};
+
+const cardStyle: React.CSSProperties = {
+  background: "#ffffff",
+  borderRadius: "20px",
+  padding: "24px",
+  border: "1px solid #d9e3f1",
+  boxShadow: "0 14px 34px rgba(20, 40, 90, 0.08)",
+};
+
+const gridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+  gap: "14px",
+};
+
+const labelStyle: React.CSSProperties = {
+  fontWeight: 700,
+  color: "#16213e",
+};
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "14px",
+  borderRadius: "12px",
+  border: "1px solid #cfd7e6",
+  fontSize: "15px",
+  marginTop: "6px",
+  background: "#fbfcfe",
+};
+
+const buttonRowStyle: React.CSSProperties = {
+  display: "flex",
+  gap: "12px",
+  flexWrap: "wrap",
+  marginTop: "18px",
+};
+
+const primaryButtonStyle: React.CSSProperties = {
+  padding: "12px 18px",
+  borderRadius: "12px",
+  border: "none",
+  background: "#173d70",
+  color: "#ffffff",
+  fontWeight: 800,
+  cursor: "pointer",
+};
+
+const secondaryButtonStyle: React.CSSProperties = {
+  padding: "12px 18px",
+  borderRadius: "12px",
+  border: "1px solid #cfd7e6",
+  background: "#ffffff",
+  color: "#16213e",
+  fontWeight: 700,
+  textDecoration: "none",
+};
+
+const previewStyle: React.CSSProperties = {
+  border: "1px solid #d9e3f1",
+  borderRadius: "14px",
+  background: "#f6f9fd",
+  padding: "16px",
+  marginTop: "18px",
+};
 
 export default function NewEventPage() {
-  const router = useRouter();
-
-  const [saving, setSaving] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-
   const [name, setName] = useState("");
   const [status, setStatus] = useState("Needs SPs");
   const [dateText, setDateText] = useState("");
-  const [spNeeded, setSpNeeded] = useState("0");
-  const [spAssigned, setSpAssigned] = useState("0");
-  const [visibility, setVisibility] = useState("team");
+  const [spNeeded, setSpNeeded] = useState("");
+  const [spAssigned, setSpAssigned] = useState("");
+  const [location, setLocation] = useState("");
+  const [visibility, setVisibility] = useState("Team");
+  const [notes, setNotes] = useState("");
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    setErrorMessage("");
+  const previewId = useMemo(() => {
+    const base = name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    return base || "new-event-id";
+  }, [name]);
 
-    const payload = {
-      name: name.trim(),
-      status,
-      date_text: dateText.trim(),
-      sp_needed: parseNumber(spNeeded),
-      sp_assigned: parseNumber(spAssigned),
-      visibility,
-    };
+  function handleSave() {
+    alert(`(Next step: connect to Supabase)\n\nEvent: ${name}`);
+  }
 
-    const { error } = await supabase.from("events").insert([payload]);
-
-    if (error) {
-      console.error("Error creating event:", error);
-      setErrorMessage("Could not create event.");
-      setSaving(false);
-      return;
-    }
-
-    router.push("/");
-    router.refresh();
+  function handleClear() {
+    setName("");
+    setStatus("Needs SPs");
+    setDateText("");
+    setSpNeeded("");
+    setSpAssigned("");
+    setLocation("");
+    setVisibility("Team");
+    setNotes("");
   }
 
   return (
-    <div style={{ padding: "20px", maxWidth: "700px" }}>
-      <div style={{ marginBottom: "20px" }}>
-        <Link href="/">← Back to Events</Link>
+    <div style={pageStyle}>
+      <div style={shellStyle}>
+        <div style={headerStyle}>
+          <h1 style={titleStyle}>Create Event</h1>
+          <div style={subtitleStyle}>
+            Build a new event record for staffing and tracking.
+          </div>
+        </div>
+
+        <div style={cardStyle}>
+          <div style={gridStyle}>
+            <label style={labelStyle}>
+              Event Name
+              <input
+                style={inputStyle}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </label>
+
+            <label style={labelStyle}>
+              Status
+              <select
+                style={inputStyle}
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+              >
+                <option>Needs SPs</option>
+                <option>Scheduled</option>
+                <option>In Progress</option>
+                <option>Complete</option>
+              </select>
+            </label>
+
+            <label style={labelStyle}>
+              Date(s)
+              <input
+                style={inputStyle}
+                value={dateText}
+                onChange={(e) => setDateText(e.target.value)}
+              />
+            </label>
+
+            <label style={labelStyle}>
+              Location
+              <input
+                style={inputStyle}
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+              />
+            </label>
+
+            <label style={labelStyle}>
+              SP Needed
+              <input
+                style={inputStyle}
+                value={spNeeded}
+                onChange={(e) => setSpNeeded(e.target.value)}
+              />
+            </label>
+
+            <label style={labelStyle}>
+              SP Assigned
+              <input
+                style={inputStyle}
+                value={spAssigned}
+                onChange={(e) => setSpAssigned(e.target.value)}
+              />
+            </label>
+
+            <label style={labelStyle}>
+              Visibility
+              <select
+                style={inputStyle}
+                value={visibility}
+                onChange={(e) => setVisibility(e.target.value)}
+              >
+                <option>Team</option>
+                <option>Personal</option>
+              </select>
+            </label>
+          </div>
+
+          <label style={{ ...labelStyle, marginTop: "14px", display: "block" }}>
+            Notes
+            <textarea
+              style={{ ...inputStyle, minHeight: "120px" }}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </label>
+
+          <div style={previewStyle}>
+            <strong>Preview</strong>
+            <div>ID: {previewId}</div>
+            <div>Name: {name || "—"}</div>
+            <div>Status: {status}</div>
+            <div>Date(s): {dateText || "—"}</div>
+            <div>Location: {location || "—"}</div>
+          </div>
+
+          <div style={buttonRowStyle}>
+            <button style={primaryButtonStyle} onClick={handleSave}>
+              Save Event
+            </button>
+
+            <button style={secondaryButtonStyle} onClick={handleClear}>
+              Clear
+            </button>
+
+            <Link href="/events" style={secondaryButtonStyle}>
+              Back to Events
+            </Link>
+          </div>
+        </div>
       </div>
-
-      <h1 style={{ marginBottom: "20px" }}>Create New Event</h1>
-
-      {errorMessage ? (
-        <div
-          style={{
-            marginBottom: "16px",
-            padding: "12px",
-            border: "1px solid #cc0000",
-            background: "#fff5f5",
-            color: "#990000",
-            borderRadius: "8px",
-          }}
-        >
-          {errorMessage}
-        </div>
-      ) : null}
-
-      <form onSubmit={handleCreate} style={{ display: "grid", gap: "16px" }}>
-        <div>
-          <label
-            htmlFor="name"
-            style={{ display: "block", fontWeight: "bold", marginBottom: "6px" }}
-          >
-            Event Name
-          </label>
-          <input
-            id="name"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Enter event name"
-            required
-            style={{
-              width: "100%",
-              padding: "10px",
-              border: "1px solid #ccc",
-              borderRadius: "8px",
-            }}
-          />
-        </div>
-
-        <div>
-          <label
-            htmlFor="status"
-            style={{ display: "block", fontWeight: "bold", marginBottom: "6px" }}
-          >
-            Status
-          </label>
-          <select
-            id="status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "10px",
-              border: "1px solid #ccc",
-              borderRadius: "8px",
-            }}
-          >
-            {STATUSES.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label
-            htmlFor="dateText"
-            style={{ display: "block", fontWeight: "bold", marginBottom: "6px" }}
-          >
-            Date(s)
-          </label>
-          <input
-            id="dateText"
-            type="text"
-            value={dateText}
-            onChange={(e) => setDateText(e.target.value)}
-            placeholder="Example: 4/20, 4/21"
-            style={{
-              width: "100%",
-              padding: "10px",
-              border: "1px solid #ccc",
-              borderRadius: "8px",
-            }}
-          />
-        </div>
-
-        <div>
-          <label
-            htmlFor="spNeeded"
-            style={{ display: "block", fontWeight: "bold", marginBottom: "6px" }}
-          >
-            SP Needed
-          </label>
-          <input
-            id="spNeeded"
-            type="number"
-            min="0"
-            value={spNeeded}
-            onChange={(e) => setSpNeeded(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "10px",
-              border: "1px solid #ccc",
-              borderRadius: "8px",
-            }}
-          />
-        </div>
-
-        <div>
-          <label
-            htmlFor="spAssigned"
-            style={{ display: "block", fontWeight: "bold", marginBottom: "6px" }}
-          >
-            SP Assigned
-          </label>
-          <input
-            id="spAssigned"
-            type="number"
-            min="0"
-            value={spAssigned}
-            onChange={(e) => setSpAssigned(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "10px",
-              border: "1px solid #ccc",
-              borderRadius: "8px",
-            }}
-          />
-        </div>
-
-        <div>
-          <label
-            htmlFor="visibility"
-            style={{ display: "block", fontWeight: "bold", marginBottom: "6px" }}
-          >
-            Visibility
-          </label>
-          <select
-            id="visibility"
-            value={visibility}
-            onChange={(e) => setVisibility(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "10px",
-              border: "1px solid #ccc",
-              borderRadius: "8px",
-            }}
-          >
-            {VISIBILITIES.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
-          <button
-            type="submit"
-            disabled={saving}
-            style={{
-              padding: "10px 16px",
-              borderRadius: "8px",
-              border: "1px solid #222",
-              background: "#111",
-              color: "#fff",
-              cursor: saving ? "not-allowed" : "pointer",
-              opacity: saving ? 0.7 : 1,
-            }}
-          >
-            {saving ? "Creating..." : "Create Event"}
-          </button>
-
-          <Link
-            href="/"
-            style={{
-              display: "inline-block",
-              padding: "10px 16px",
-              borderRadius: "8px",
-              border: "1px solid #ccc",
-              color: "#111",
-              textDecoration: "none",
-            }}
-          >
-            Cancel
-          </Link>
-        </div>
-      </form>
     </div>
   );
 }

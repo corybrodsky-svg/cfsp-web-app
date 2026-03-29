@@ -1,42 +1,57 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "../../lib/supabaseClient";
+import { useRouter } from "next/navigation";
+import SiteShell from "../components/SiteShell";
+import { supabase } from "../lib/supabaseClient";
 
-export default function MyProfile() {
-  const [sp, setSp] = useState<any>(null);
+const cardStyle: React.CSSProperties = {
+  border: "1px solid #d8e0ec",
+  borderRadius: "16px",
+  padding: "18px",
+  background: "#f8fbff",
+  marginBottom: "16px",
+};
 
-  useEffect(() => {
-    async function loadMySP() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+const buttonStyle: React.CSSProperties = {
+  padding: "12px 18px",
+  borderRadius: "12px",
+  border: "1px solid #cfd7e6",
+  background: "#1d4ed8",
+  color: "#fff",
+  fontWeight: 700,
+  cursor: "pointer",
+};
 
-      if (!user) return;
+export default function MePage() {
+  const router = useRouter();
 
-      const { data } = await supabase
-        .from("sps")
-        .select("*")
-        .eq("user_id", user.id)
-        .single();
-
-      setSp(data);
-    }
-
-    loadMySP();
-  }, []);
-
-  if (!sp) return <div style={{ padding: 40 }}>Loading your profile...</div>;
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+    router.push("/login");
+  }
 
   return (
-    <div style={{ padding: 40 }}>
-      <h1>My Profile</h1>
+    <SiteShell title="Me" subtitle="Personal workspace placeholder page.">
+      <div style={cardStyle}>
+        <h3 style={{ marginTop: 0 }}>Profile Snapshot</h3>
+        <p>
+          <strong>Name:</strong> Cory
+        </p>
+        <p>
+          <strong>Role:</strong> Administrator / Sim Ops
+        </p>
+        <p style={{ marginBottom: 0 }}>
+          <strong>Focus:</strong> clean linked routes, stable event pages, and
+          getting this app live tonight.
+        </p>
+      </div>
 
-      <p><b>Name:</b> {sp.full_name}</p>
-      <p><b>Email:</b> {sp.email}</p>
-      <p><b>Phone:</b> {sp.phone}</p>
-      <p><b>Skills:</b> {sp.skills}</p>
-      <p><b>Notes:</b> {sp.notes}</p>
-    </div>
+      <div style={cardStyle}>
+        <h3 style={{ marginTop: 0 }}>Account Action</h3>
+        <button type="button" style={buttonStyle} onClick={handleSignOut}>
+          Sign Out
+        </button>
+      </div>
+    </SiteShell>
   );
 }
