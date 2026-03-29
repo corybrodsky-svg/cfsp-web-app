@@ -1,19 +1,29 @@
 import "./globals.css";
-import type { Metadata } from "next";
+import AppHeader from "./components/AppHeader";
 
-export const metadata: Metadata = {
-  title: "CFSP",
-  description: "Conflict-Free SP scheduling and event management",
+export const metadata = {
+  title: "Conflict-Free SP",
+  description: "Simulation Scheduling Platform",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body
+        style={{
+          margin: 0,
+          background: "#f4f7fb",
+          fontFamily:
+            'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        }}
+      >
+        <AppHeader />
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: 20 }}>{children}</div>
+      </body>
     </html>
   );
 }

@@ -62,36 +62,36 @@ const eventsSeed: EventItem[] = [
   },
 ];
 
-const pageBg = "#F4F7F8";
-const panelBg = "#FFFFFF";
-const sidebarBg = "#F8FBFB";
-const ink = "#1F3A5F";
-const inkSoft = "#4F6277";
-const teal = "#2F7D6B";
-const tealDark = "#245F52";
-const line = "#D7E0E5";
-const softTeal = "#EDF6F3";
-const softSlate = "#EEF3F6";
-const softAmber = "#F8F1E7";
-const amber = "#A86B1F";
-const softRed = "#F9ECEC";
-const danger = "#C94B4B";
-const success = "#2F7D6B";
+const colors = {
+  pageBg: "#f4f7fb",
+  cardBg: "#ffffff",
+  navy: "#163a70",
+  blue: "#1E5AA8",
+  green: "#2E8B57",
+  red: "#C0392B",
+  amber: "#D68910",
+  slate: "#5f6f86",
+  border: "#d9e2ef",
+  softBlue: "#edf4ff",
+  softGreen: "#edf8f1",
+  softRed: "#fdf0ee",
+  softGray: "#eef2f7",
+};
 
 function getStatusColors(status: EventItem["status"]) {
   switch (status) {
     case "Needs SPs":
-      return { bg: softRed, text: danger, borderColor: "#E9C6C6" };
+      return { bg: colors.softRed, text: colors.red, borderColor: "#f2c8c2" };
     case "Scheduled":
-      return { bg: softTeal, text: tealDark, borderColor: "#C6E0D9" };
+      return { bg: colors.softGreen, text: colors.green, borderColor: "#bfe0cb" };
     case "In Progress":
-      return { bg: softAmber, text: amber, borderColor: "#E7D1B0" };
+      return { bg: "#fff7e8", text: colors.amber, borderColor: "#f1dbab" };
     case "Completed":
-      return { bg: softSlate, text: ink, borderColor: "#D5E0E8" };
+      return { bg: colors.softBlue, text: colors.blue, borderColor: "#c8daf5" };
     case "Canceled":
-      return { bg: "#F2F4F6", text: inkSoft, borderColor: "#DCE3E8" };
+      return { bg: colors.softGray, text: colors.slate, borderColor: "#d7deea" };
     default:
-      return { bg: softSlate, text: inkSoft, borderColor: line };
+      return { bg: colors.softGray, text: colors.slate, borderColor: colors.border };
   }
 }
 
@@ -103,94 +103,6 @@ function summaryFromEvents(events: EventItem[]) {
   ).length;
 
   return { totalEvents, totalAssigned, totalConflicts };
-}
-
-function CFSPLogo({
-  compact = false,
-  showTagline = false,
-}: {
-  compact?: boolean;
-  showTagline?: boolean;
-}) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: compact ? 10 : 14 }}>
-      <div
-        style={{
-          width: compact ? 40 : 52,
-          height: compact ? 40 : 52,
-          borderRadius: compact ? 12 : 16,
-          background: `linear-gradient(135deg, ${ink} 0%, ${teal} 100%)`,
-          display: "grid",
-          placeItems: "center",
-          color: "#ffffff",
-          fontWeight: 900,
-          fontSize: compact ? 16 : 20,
-          boxShadow: "0 10px 24px rgba(31, 58, 95, 0.14)",
-          border: "1px solid rgba(255,255,255,0.35)",
-          flexShrink: 0,
-        }}
-      >
-        CF
-      </div>
-
-      <div>
-        <div
-          style={{
-            fontSize: compact ? 18 : 22,
-            fontWeight: 900,
-            color: ink,
-            lineHeight: 1.05,
-            letterSpacing: -0.3,
-          }}
-        >
-          Conflict-Free SP
-        </div>
-        {showTagline ? (
-          <div
-            style={{
-              marginTop: 4,
-              fontSize: 12,
-              fontWeight: 700,
-              color: inkSoft,
-              letterSpacing: 0.2,
-            }}
-          >
-            Precision scheduling for simulation programs
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function SidebarLink({
-  href,
-  label,
-  active = false,
-}: {
-  href: string;
-  label: string;
-  active?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      style={{
-        display: "block",
-        padding: "12px 14px",
-        borderRadius: 12,
-        textDecoration: "none",
-        fontWeight: 800,
-        fontSize: 15,
-        color: active ? "#ffffff" : ink,
-        background: active ? teal : "transparent",
-        border: active ? `1px solid ${teal}` : "1px solid transparent",
-        transition: "all 0.2s ease",
-      }}
-    >
-      {label}
-    </Link>
-  );
 }
 
 function SummaryCard({
@@ -207,19 +119,21 @@ function SummaryCard({
   return (
     <div
       style={{
-        background: panelBg,
-        border: `1px solid ${line}`,
+        background: colors.cardBg,
+        border: `1px solid ${colors.border}`,
         borderLeft: `6px solid ${accent}`,
         borderRadius: 18,
         padding: 20,
-        boxShadow: "0 8px 22px rgba(24, 45, 72, 0.05)",
+        boxShadow: "0 8px 22px rgba(19, 45, 89, 0.06)",
       }}
     >
-      <div style={{ fontSize: 13, fontWeight: 800, color: inkSoft, letterSpacing: 0.3 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: colors.slate, letterSpacing: 0.3 }}>
         {label}
       </div>
-      <div style={{ fontSize: 34, fontWeight: 900, color: ink, marginTop: 8 }}>{value}</div>
-      <div style={{ fontSize: 13, color: inkSoft, marginTop: 6 }}>{subtext}</div>
+      <div style={{ fontSize: 34, fontWeight: 800, color: colors.navy, marginTop: 8 }}>
+        {value}
+      </div>
+      <div style={{ fontSize: 13, color: colors.slate, marginTop: 6 }}>{subtext}</div>
     </div>
   );
 }
@@ -246,10 +160,10 @@ function ActionButton({
         textDecoration: "none",
         fontWeight: 800,
         fontSize: 14,
-        background: primary ? teal : "#ffffff",
-        color: primary ? "#ffffff" : ink,
-        border: primary ? `1px solid ${teal}` : `1px solid ${line}`,
-        boxShadow: primary ? "0 10px 20px rgba(47, 125, 107, 0.16)" : "none",
+        background: primary ? colors.blue : "#ffffff",
+        color: primary ? "#ffffff" : colors.navy,
+        border: primary ? `1px solid ${colors.blue}` : `1px solid ${colors.border}`,
+        boxShadow: primary ? "0 10px 20px rgba(30, 90, 168, 0.18)" : "none",
       }}
     >
       {label}
@@ -281,567 +195,474 @@ export default function DashboardPage() {
   }
 
   return (
-    <main
+    <div
       style={{
         minHeight: "100vh",
-        background: pageBg,
-        color: ink,
-        fontFamily:
-          'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        background: colors.pageBg,
+        color: colors.navy,
       }}
     >
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "260px minmax(0, 1fr)",
-          minHeight: "100vh",
+          marginBottom: 24,
+          borderRadius: 26,
+          overflow: "hidden",
+          border: `1px solid ${colors.border}`,
+          background: colors.cardBg,
+          boxShadow: "0 12px 28px rgba(19, 45, 89, 0.08)",
         }}
       >
-        <aside
+        <div
           style={{
-            background: sidebarBg,
-            borderRight: `1px solid ${line}`,
-            padding: 22,
-            position: "sticky",
-            top: 0,
-            height: "100vh",
+            position: "relative",
+            minHeight: 260,
+            backgroundImage: "url('/cfsp-hero-logo.png')",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            display: "flex",
+            alignItems: "flex-end",
           }}
         >
           <div
             style={{
-              marginBottom: 28,
-              paddingBottom: 18,
-              borderBottom: `1px solid ${line}`,
+              position: "absolute",
+              inset: 0,
+              background:
+                "linear-gradient(180deg, rgba(10,25,47,0.08) 0%, rgba(10,25,47,0.4) 100%)",
             }}
-          >
-            <CFSPLogo compact showTagline />
-          </div>
-
-          <nav style={{ display: "grid", gap: 8 }}>
-            <SidebarLink href="/dashboard" label="Dashboard" active />
-            <SidebarLink href="/events" label="Events" />
-            <SidebarLink href="/sp-directory" label="SP Directory" />
-            <SidebarLink href="/assignments" label="Assignments" />
-            <SidebarLink href="/payroll" label="Payroll" />
-            <SidebarLink href="/admin" label="Admin" />
-          </nav>
-
+          />
           <div
             style={{
-              marginTop: 24,
-              padding: 16,
-              borderRadius: 16,
-              background: softTeal,
-              border: `1px solid #D5E7E1`,
+              position: "relative",
+              zIndex: 2,
+              padding: "28px",
+              width: "100%",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 9,
-                  background: teal,
-                  color: "#fff",
-                  display: "grid",
-                  placeItems: "center",
-                  fontWeight: 900,
-                  fontSize: 12,
-                }}
-              >
-                CF
-              </div>
-              <div style={{ fontSize: 13, fontWeight: 900, color: tealDark }}>Quick Status</div>
+            <div
+              style={{
+                display: "inline-block",
+                padding: "6px 10px",
+                borderRadius: 999,
+                background: "rgba(255,255,255,0.88)",
+                color: colors.navy,
+                fontWeight: 800,
+                fontSize: 12,
+                marginBottom: 12,
+              }}
+            >
+              Conflict-Free SP
             </div>
 
-            <div style={{ fontSize: 13, color: inkSoft, lineHeight: 1.5 }}>
-              You have{" "}
-              <span style={{ fontWeight: 900, color: danger }}>{summary.totalConflicts}</span> event
-              {summary.totalConflicts === 1 ? "" : "s"} that still need SP attention.
-            </div>
+            <h1
+              style={{
+                margin: 0,
+                fontSize: 40,
+                fontWeight: 900,
+                color: "#ffffff",
+                letterSpacing: -0.5,
+              }}
+            >
+              Dashboard
+            </h1>
+
+            <p
+              style={{
+                margin: "8px 0 0",
+                maxWidth: 700,
+                color: "rgba(255,255,255,0.94)",
+                fontSize: 16,
+                lineHeight: 1.5,
+                fontWeight: 500,
+              }}
+            >
+              Clean overview of events, assignments, and scheduling risk using your new CFSP brand.
+            </p>
           </div>
-        </aside>
+        </div>
+      </div>
 
-        <section style={{ minWidth: 0 }}>
-          <header
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+          gap: 18,
+          marginBottom: 24,
+        }}
+      >
+        <SummaryCard
+          label="Total Events"
+          value={summary.totalEvents}
+          accent={colors.blue}
+          subtext="Visible in current dashboard view"
+        />
+        <SummaryCard
+          label="SPs Assigned"
+          value={summary.totalAssigned}
+          accent={colors.green}
+          subtext="Across all visible events"
+        />
+        <SummaryCard
+          label="Conflicts Detected"
+          value={summary.totalConflicts}
+          accent={colors.red}
+          subtext="Events needing more SP coverage"
+        />
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1.5fr) minmax(320px, 0.85fr)",
+          gap: 20,
+        }}
+      >
+        <div
+          style={{
+            background: colors.cardBg,
+            border: `1px solid ${colors.border}`,
+            borderRadius: 22,
+            boxShadow: "0 12px 28px rgba(19, 45, 89, 0.07)",
+            overflow: "hidden",
+          }}
+        >
+          <div
             style={{
-              position: "sticky",
-              top: 0,
-              zIndex: 20,
-              background: "rgba(244, 247, 248, 0.92)",
-              backdropFilter: "blur(10px)",
-              borderBottom: `1px solid ${line}`,
+              padding: 20,
+              borderBottom: `1px solid ${colors.border}`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              flexWrap: "wrap",
             }}
           >
-            <div
-              style={{
-                maxWidth: 1280,
-                margin: "0 auto",
-                padding: "18px 24px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 16,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                <CFSPLogo />
-                <div>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: ink }}>Dashboard</div>
-                  <div style={{ fontSize: 14, color: inkSoft, marginTop: 4 }}>
-                    Clean overview of events, assignments, and conflict risk.
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                <ActionButton href="/events/new" label="+ Create Event" primary />
-                <ActionButton href="/login" label="Logout" />
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: colors.navy }}>Upcoming Events</div>
+              <div style={{ fontSize: 13, color: colors.slate, marginTop: 4 }}>
+                Click any event to expand details without leaving the page.
               </div>
             </div>
-          </header>
 
-          <div style={{ maxWidth: 1280, margin: "0 auto", padding: 24 }}>
-            <div
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search events..."
               style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                gap: 18,
-                marginBottom: 24,
+                width: 240,
+                maxWidth: "100%",
+                border: `1px solid ${colors.border}`,
+                borderRadius: 12,
+                padding: "11px 14px",
+                fontSize: 14,
+                outline: "none",
+                color: colors.navy,
+                background: "#ffffff",
               }}
-            >
-              <SummaryCard
-                label="Total Events"
-                value={summary.totalEvents}
-                accent={ink}
-                subtext="Visible in current dashboard view"
-              />
-              <SummaryCard
-                label="SPs Assigned"
-                value={summary.totalAssigned}
-                accent={teal}
-                subtext="Across all visible events"
-              />
-              <SummaryCard
-                label="Conflicts Detected"
-                value={summary.totalConflicts}
-                accent={danger}
-                subtext="Events needing more SP coverage"
-              />
-            </div>
+            />
+          </div>
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0, 1.5fr) minmax(320px, 0.85fr)",
-                gap: 20,
-              }}
-            >
+          <div style={{ padding: 18 }}>
+            {events.length === 0 ? (
               <div
                 style={{
-                  background: panelBg,
-                  border: `1px solid ${line}`,
-                  borderRadius: 22,
-                  boxShadow: "0 12px 28px rgba(19, 45, 89, 0.06)",
-                  overflow: "hidden",
+                  border: `1px dashed ${colors.border}`,
+                  borderRadius: 16,
+                  padding: 24,
+                  textAlign: "center",
+                  color: colors.slate,
+                  fontSize: 14,
                 }}
               >
-                <div
-                  style={{
-                    padding: 20,
-                    borderBottom: `1px solid ${line}`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 12,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 20, fontWeight: 900, color: ink }}>Upcoming Events</div>
-                    <div style={{ fontSize: 13, color: inkSoft, marginTop: 4 }}>
-                      Click any event to expand details without leaving the page.
-                    </div>
-                  </div>
+                No events match your search.
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: 14 }}>
+                {events.map((event) => {
+                  const isExpanded = expandedIds.includes(event.id);
+                  const statusStyle = getStatusColors(event.status);
+                  const coveragePct =
+                    event.spNeeded > 0
+                      ? Math.max(0, Math.min(100, Math.round((event.spAssigned / event.spNeeded) * 100)))
+                      : 0;
 
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search events..."
-                    style={{
-                      width: 240,
-                      maxWidth: "100%",
-                      border: `1px solid ${line}`,
-                      borderRadius: 12,
-                      padding: "11px 14px",
-                      fontSize: 14,
-                      outline: "none",
-                      color: ink,
-                      background: "#ffffff",
-                    }}
-                  />
-                </div>
-
-                <div style={{ padding: 18 }}>
-                  {events.length === 0 ? (
+                  return (
                     <div
+                      key={event.id}
                       style={{
-                        border: `1px dashed ${line}`,
-                        borderRadius: 16,
-                        padding: 24,
-                        textAlign: "center",
-                        color: inkSoft,
-                        fontSize: 14,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: 18,
+                        overflow: "hidden",
+                        background: "#ffffff",
                       }}
                     >
-                      No events match your search.
-                    </div>
-                  ) : (
-                    <div style={{ display: "grid", gap: 14 }}>
-                      {events.map((event) => {
-                        const isExpanded = expandedIds.includes(event.id);
-                        const statusStyle = getStatusColors(event.status);
-                        const coveragePct =
-                          event.spNeeded > 0
-                            ? Math.max(0, Math.min(100, Math.round((event.spAssigned / event.spNeeded) * 100)))
-                            : 0;
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(event.id)}
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          border: "none",
+                          background: "#ffffff",
+                          padding: 18,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 14,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <div style={{ minWidth: 0 }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 10,
+                                flexWrap: "wrap",
+                                marginBottom: 6,
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: 18,
+                                  fontWeight: 900,
+                                  color: colors.navy,
+                                }}
+                              >
+                                {isExpanded ? "▼" : "▶"} {event.title}
+                              </span>
 
-                        return (
-                          <div
-                            key={event.id}
-                            style={{
-                              border: `1px solid ${line}`,
-                              borderRadius: 18,
-                              overflow: "hidden",
-                              background: "#ffffff",
-                            }}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => toggleExpand(event.id)}
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  padding: "5px 10px",
+                                  borderRadius: 999,
+                                  fontSize: 12,
+                                  fontWeight: 800,
+                                  background: statusStyle.bg,
+                                  color: statusStyle.text,
+                                  border: `1px solid ${statusStyle.borderColor}`,
+                                }}
+                              >
+                                {event.status}
+                              </span>
+                            </div>
+
+                            <div style={{ fontSize: 14, color: colors.slate }}>
+                              {event.dateText} • {event.location} • Lead: {event.simOpLead}
+                            </div>
+                          </div>
+
+                          <div style={{ minWidth: 180 }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                fontSize: 12,
+                                color: colors.slate,
+                                fontWeight: 700,
+                                marginBottom: 6,
+                              }}
+                            >
+                              <span>Coverage</span>
+                              <span>
+                                {event.spAssigned}/{event.spNeeded}
+                              </span>
+                            </div>
+                            <div
                               style={{
                                 width: "100%",
-                                textAlign: "left",
-                                border: "none",
-                                background: "#ffffff",
-                                padding: 18,
-                                cursor: "pointer",
+                                height: 10,
+                                borderRadius: 999,
+                                background: "#eaf0f7",
+                                overflow: "hidden",
                               }}
                             >
                               <div
                                 style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  gap: 14,
-                                  flexWrap: "wrap",
+                                  width: `${coveragePct}%`,
+                                  height: "100%",
+                                  background:
+                                    coveragePct >= 100
+                                      ? colors.green
+                                      : coveragePct >= 60
+                                      ? colors.blue
+                                      : colors.red,
                                 }}
-                              >
-                                <div style={{ minWidth: 0 }}>
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 10,
-                                      flexWrap: "wrap",
-                                      marginBottom: 6,
-                                    }}
-                                  >
-                                    <span
-                                      style={{
-                                        fontSize: 18,
-                                        fontWeight: 900,
-                                        color: ink,
-                                      }}
-                                    >
-                                      {isExpanded ? "▼" : "▶"} {event.title}
-                                    </span>
-
-                                    <span
-                                      style={{
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        padding: "5px 10px",
-                                        borderRadius: 999,
-                                        fontSize: 12,
-                                        fontWeight: 800,
-                                        background: statusStyle.bg,
-                                        color: statusStyle.text,
-                                        border: `1px solid ${statusStyle.borderColor}`,
-                                      }}
-                                    >
-                                      {event.status}
-                                    </span>
-                                  </div>
-
-                                  <div style={{ fontSize: 14, color: inkSoft }}>
-                                    {event.dateText} • {event.location} • Lead: {event.simOpLead}
-                                  </div>
-                                </div>
-
-                                <div style={{ minWidth: 180 }}>
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      justifyContent: "space-between",
-                                      fontSize: 12,
-                                      color: inkSoft,
-                                      fontWeight: 700,
-                                      marginBottom: 6,
-                                    }}
-                                  >
-                                    <span>Coverage</span>
-                                    <span>
-                                      {event.spAssigned}/{event.spNeeded}
-                                    </span>
-                                  </div>
-                                  <div
-                                    style={{
-                                      width: "100%",
-                                      height: 10,
-                                      borderRadius: 999,
-                                      background: "#E7EDF1",
-                                      overflow: "hidden",
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        width: `${coveragePct}%`,
-                                        height: "100%",
-                                        background:
-                                          coveragePct >= 100
-                                            ? success
-                                            : coveragePct >= 60
-                                            ? teal
-                                            : danger,
-                                      }}
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            </button>
-
-                            {isExpanded && (
-                              <div
-                                style={{
-                                  padding: "0 18px 18px 18px",
-                                  borderTop: `1px solid ${line}`,
-                                  background: "#FBFDFC",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    display: "grid",
-                                    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-                                    gap: 12,
-                                    marginTop: 16,
-                                  }}
-                                >
-                                  <div
-                                    style={{
-                                      border: `1px solid ${line}`,
-                                      borderRadius: 14,
-                                      padding: 14,
-                                      background: "#ffffff",
-                                    }}
-                                  >
-                                    <div style={{ fontSize: 12, color: inkSoft, fontWeight: 700 }}>Rooms</div>
-                                    <div style={{ fontSize: 22, fontWeight: 900, color: ink, marginTop: 4 }}>
-                                      {event.rooms}
-                                    </div>
-                                  </div>
-
-                                  <div
-                                    style={{
-                                      border: `1px solid ${line}`,
-                                      borderRadius: 14,
-                                      padding: 14,
-                                      background: "#ffffff",
-                                    }}
-                                  >
-                                    <div style={{ fontSize: 12, color: inkSoft, fontWeight: 700 }}>SP Needed</div>
-                                    <div style={{ fontSize: 22, fontWeight: 900, color: ink, marginTop: 4 }}>
-                                      {event.spNeeded}
-                                    </div>
-                                  </div>
-
-                                  <div
-                                    style={{
-                                      border: `1px solid ${line}`,
-                                      borderRadius: 14,
-                                      padding: 14,
-                                      background: "#ffffff",
-                                    }}
-                                  >
-                                    <div style={{ fontSize: 12, color: inkSoft, fontWeight: 700 }}>Assigned</div>
-                                    <div style={{ fontSize: 22, fontWeight: 900, color: ink, marginTop: 4 }}>
-                                      {event.spAssigned}
-                                    </div>
-                                  </div>
-
-                                  <div
-                                    style={{
-                                      border: `1px solid ${line}`,
-                                      borderRadius: 14,
-                                      padding: 14,
-                                      background: "#ffffff",
-                                    }}
-                                  >
-                                    <div style={{ fontSize: 12, color: inkSoft, fontWeight: 700 }}>Lead</div>
-                                    <div style={{ fontSize: 22, fontWeight: 900, color: ink, marginTop: 4 }}>
-                                      {event.simOpLead}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    gap: 10,
-                                    flexWrap: "wrap",
-                                    marginTop: 16,
-                                  }}
-                                >
-                                  <ActionButton href={`/events/${event.id}`} label="View Event" primary />
-                                  <ActionButton href={`/events/${event.id}/assign`} label="Assign SPs" />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gap: 20 }}>
-                <div
-                  style={{
-                    background: panelBg,
-                    border: `1px solid ${line}`,
-                    borderRadius: 22,
-                    padding: 20,
-                    boxShadow: "0 12px 28px rgba(19, 45, 89, 0.06)",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
-                    <CFSPLogo compact />
-                  </div>
-                  <div style={{ fontSize: 20, fontWeight: 900, color: ink }}>Quick Actions</div>
-                  <div style={{ fontSize: 13, color: inkSoft, marginTop: 4 }}>
-                    Fast paths for the work you do most.
-                  </div>
-
-                  <div style={{ display: "grid", gap: 10, marginTop: 16 }}>
-                    <ActionButton href="/events/new" label="Create New Event" primary />
-                    <ActionButton href="/events" label="Open All Events" />
-                    <ActionButton href="/sp-directory" label="Open SP Directory" />
-                    <ActionButton href="/payroll" label="Go to Payroll" />
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    background: panelBg,
-                    border: `1px solid ${line}`,
-                    borderRadius: 22,
-                    padding: 20,
-                    boxShadow: "0 12px 28px rgba(19, 45, 89, 0.06)",
-                  }}
-                >
-                  <div style={{ fontSize: 20, fontWeight: 900, color: ink }}>Attention Needed</div>
-                  <div style={{ fontSize: 13, color: inkSoft, marginTop: 4 }}>
-                    Events below full SP coverage.
-                  </div>
-
-                  <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
-                    {eventsSeed
-                      .filter((event) => event.spAssigned < event.spNeeded && event.status !== "Canceled")
-                      .map((event) => (
-                        <div
-                          key={`attention-${event.id}`}
-                          style={{
-                            border: `1px solid #E7D3D3`,
-                            background: softRed,
-                            borderRadius: 16,
-                            padding: 14,
-                          }}
-                        >
-                          <div style={{ fontSize: 15, fontWeight: 800, color: ink }}>{event.title}</div>
-                          <div style={{ fontSize: 13, color: inkSoft, marginTop: 4 }}>
-                            {event.dateText} • {event.spAssigned}/{event.spNeeded} assigned
+                              />
+                            </div>
                           </div>
                         </div>
-                      ))}
-                  </div>
-                </div>
+                      </button>
 
-                <div
-                  style={{
-                    background: panelBg,
-                    border: `1px solid ${line}`,
-                    borderRadius: 22,
-                    padding: 20,
-                    boxShadow: "0 12px 28px rgba(19, 45, 89, 0.06)",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-                    <div
-                      style={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: 12,
-                        background: `linear-gradient(135deg, ${ink} 0%, ${teal} 100%)`,
-                        color: "#fff",
-                        display: "grid",
-                        placeItems: "center",
-                        fontWeight: 900,
-                        fontSize: 13,
-                      }}
-                    >
-                      CF
+                      {isExpanded && (
+                        <div
+                          style={{
+                            padding: "0 18px 18px 18px",
+                            borderTop: `1px solid ${colors.border}`,
+                            background: "#fbfcfe",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                              gap: 12,
+                              marginTop: 16,
+                            }}
+                          >
+                            <div
+                              style={{
+                                border: `1px solid ${colors.border}`,
+                                borderRadius: 14,
+                                padding: 14,
+                                background: "#ffffff",
+                              }}
+                            >
+                              <div style={{ fontSize: 12, color: colors.slate, fontWeight: 700 }}>Rooms</div>
+                              <div style={{ fontSize: 22, fontWeight: 900, color: colors.navy, marginTop: 4 }}>
+                                {event.rooms}
+                              </div>
+                            </div>
+
+                            <div
+                              style={{
+                                border: `1px solid ${colors.border}`,
+                                borderRadius: 14,
+                                padding: 14,
+                                background: "#ffffff",
+                              }}
+                            >
+                              <div style={{ fontSize: 12, color: colors.slate, fontWeight: 700 }}>SP Needed</div>
+                              <div style={{ fontSize: 22, fontWeight: 900, color: colors.navy, marginTop: 4 }}>
+                                {event.spNeeded}
+                              </div>
+                            </div>
+
+                            <div
+                              style={{
+                                border: `1px solid ${colors.border}`,
+                                borderRadius: 14,
+                                padding: 14,
+                                background: "#ffffff",
+                              }}
+                            >
+                              <div style={{ fontSize: 12, color: colors.slate, fontWeight: 700 }}>Assigned</div>
+                              <div style={{ fontSize: 22, fontWeight: 900, color: colors.navy, marginTop: 4 }}>
+                                {event.spAssigned}
+                              </div>
+                            </div>
+
+                            <div
+                              style={{
+                                border: `1px solid ${colors.border}`,
+                                borderRadius: 14,
+                                padding: 14,
+                                background: "#ffffff",
+                              }}
+                            >
+                              <div style={{ fontSize: 12, color: colors.slate, fontWeight: 700 }}>Lead</div>
+                              <div style={{ fontSize: 22, fontWeight: 900, color: colors.navy, marginTop: 4 }}>
+                                {event.simOpLead}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 10,
+                              flexWrap: "wrap",
+                              marginTop: 16,
+                            }}
+                          >
+                            <ActionButton href={`/events/${event.id}`} label="View Event" primary />
+                            <ActionButton href={`/events/${event.id}/assign`} label="Assign SPs" />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div style={{ fontSize: 20, fontWeight: 900, color: ink }}>Admin Snapshot</div>
-                  </div>
-
-                  <div style={{ fontSize: 13, color: inkSoft, marginTop: 4 }}>
-                    Tight, readable, and expandable only when needed.
-                  </div>
-
-                  <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
-                    <div
-                      style={{
-                        padding: 14,
-                        borderRadius: 16,
-                        border: `1px solid ${line}`,
-                        background: "#ffffff",
-                      }}
-                    >
-                      <div style={{ fontSize: 12, fontWeight: 700, color: inkSoft }}>Current User</div>
-                      <div style={{ fontSize: 18, fontWeight: 900, color: ink, marginTop: 4 }}>Cory / Admin</div>
-                    </div>
-
-                    <div
-                      style={{
-                        padding: 14,
-                        borderRadius: 16,
-                        border: `1px solid ${line}`,
-                        background: "#ffffff",
-                      }}
-                    >
-                      <div style={{ fontSize: 12, fontWeight: 700, color: inkSoft }}>Design Rule</div>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: ink, marginTop: 4 }}>
-                        Nothing visible unless needed
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  );
+                })}
               </div>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gap: 20 }}>
+          <div
+            style={{
+              background: colors.cardBg,
+              border: `1px solid ${colors.border}`,
+              borderRadius: 22,
+              padding: 20,
+              boxShadow: "0 12px 28px rgba(19, 45, 89, 0.07)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+              <img
+                src="/cfsp-logo.png"
+                alt="Conflict-Free SP"
+                style={{ height: 42, width: "auto", display: "block" }}
+              />
+            </div>
+
+            <div style={{ fontSize: 20, fontWeight: 900, color: colors.navy }}>Quick Actions</div>
+            <div style={{ fontSize: 13, color: colors.slate, marginTop: 4 }}>
+              Fast paths for the work you do most.
+            </div>
+
+            <div style={{ display: "grid", gap: 10, marginTop: 16 }}>
+              <ActionButton href="/events/new" label="Create New Event" primary />
+              <ActionButton href="/events" label="Open All Events" />
+              <ActionButton href="/sp-directory" label="Open SP Directory" />
+              <ActionButton href="/upload-schedule" label="Upload Schedule" />
             </div>
           </div>
-        </section>
+
+          <div
+            style={{
+              background: colors.cardBg,
+              border: `1px solid ${colors.border}`,
+              borderRadius: 22,
+              padding: 20,
+              boxShadow: "0 12px 28px rgba(19, 45, 89, 0.07)",
+            }}
+          >
+            <div style={{ fontSize: 20, fontWeight: 900, color: colors.navy }}>Attention Needed</div>
+            <div style={{ fontSize: 13, color: colors.slate, marginTop: 4 }}>
+              Events below full SP coverage.
+            </div>
+
+            <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
+              {eventsSeed
+                .filter((event) => event.spAssigned < event.spNeeded && event.status !== "Canceled")
+                .map((event) => (
+                  <div
+                    key={`attention-${event.id}`}
+                    style={{
+                      border: `1px solid #efd0cb`,
+                      background: colors.softRed,
+                      borderRadius: 16,
+                      padding: 14,
+                    }}
+                  >
+                    <div style={{ fontSize: 15, fontWeight: 800, color: colors.navy }}>{event.title}</div>
+                    <div style={{ fontSize: 13, color: colors.slate, marginTop: 4 }}>
+                      {event.dateText} • {event.spAssigned}/{event.spNeeded} assigned
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        </div>
       </div>
-    </main>
+    </div>
   );
 }
