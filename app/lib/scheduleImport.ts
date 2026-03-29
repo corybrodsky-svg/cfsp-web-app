@@ -44,12 +44,46 @@ function normalizeSpaces(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
+function safeRead<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function safeWrite(key: string, value: unknown) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(key, JSON.stringify(value));
+}
+
+function formatISODate(date: Date): string {
+  const y = date.getFullYear();
+  const m = `${date.getMonth() + 1}`.padStart(2, "0");
+  const d = `${date.getDate()}`.padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function formatShortDate(date: Date): string {
+  return `${date.getMonth() + 1}/${date.getDate()}/${String(date.getFullYear()).slice(-2)}`;
+}
+
 function canonicalizeEmployeeName(name: string): string {
-  const cleaned = normalizeSpaces(name.replace(/\(.*?\)/g, "").replace(/\bset up only\b/gi, ""));
+  const cleaned = normalizeSpaces(
+    name
+      .replace(/\(.*?\)/g, "")
+      .replace(/\blead\b/gi, "")
+      .replace(/\bset\s*up\s*only\b/gi, "")
+      .replace(/\bsetup\s*only\b/gi, "")
+  );
+
   if (!cleaned) return "";
 
   const lower = cleaned.toLowerCase();
-
   if (lower === "pat") return "Patrick";
   if (lower === "jp") return "JP";
 
@@ -92,23 +126,11 @@ function splitEmployees(raw: string): string[] {
   return out;
 }
 
-function cleanRoom(raw: string): string {
-  if (!raw) return "";
-
-  const first = raw.split(",")[0]?.trim() ?? "";
-  const noParen = first.replace(/\(.*?\)/g, "").trim();
-  return noParen.replace(/\s+/g, " ").toUpperCase();
-}
-
-function formatISODate(date: Date): string {
-  const y = date.getFullYear();
-  const m = `${date.getMonth() + 1}`.padStart(2, "0");
-  const d = `${date.getDate()}`.padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function formatShortDate(date: Date): string {
-  return `${date.getMonth() + 1}/${date.getDate()}/${String(date.getFullYear()).slice(-2)}`;
+function usernameFromName(name: string) {
+  const parts = normalizeSpaces(name).split(" ").filter(Boolean);
+  if (parts.length === 0) return "user";
+  if (parts.length === 1) return parts[0].toLowerCase();
+  return `${parts[0][0]}${parts[parts.length - 1]}`.toLowerCase();
 }
 
 function tryParseDateHeader(text: string): Date | null {
@@ -131,6 +153,88 @@ function tryParseDateHeader(text: string): Date | null {
   if (!Number.isNaN(direct.getTime())) return direct;
 
   return null;
+}
+
+function shouldTreatAsSessionRow(a: string, c: string, d: string, currentDate: Date | null) {
+  if (!currentDate) return false;
+  if (!a) return false;
+  if (!c) return false;
+  if (!d) return false;
+  if (tryParseDateHeader(a)) return false;
+  return true;
+}
+
+function normalizeRoomToken(token: string): string {
+  return token
+    .replace(/\(.*?\)/g, "")
+    .replace(/\s+/g, "")
+    .replace(/[^A-Z0-9]/gi, "")
+    .toUpperCase()
+    .trim();
+}
+
+function looksLikeRoomToken(token: string): boolean {
+  const normalized = normalizeRoomToken(token);
+  if (!normalized) return false;
+
+  // catches things like 8E07, 8E7, 8W105, G29, 216, etc.
+  if (/^\d+[A-Z]+\d+[A-Z0-9]*$/.test(normalized)) return true;
+  if(/^[A-Z]+\d+[A-Z0-9]*$/.test(normalized)) return true;
+  if (/^\d{2,4}[A-Z]*$/.test(normalized)) return true;
+
+  return false;
+}
+
+function cleanRoom(raw: string): string {
+  const normalized = normalizeRoomToken(raw);
+  return normalized || normalizeSpaces(raw).toUpperCase();
+}
+
+function splitRoomSegments(raw: string): string[] {
+  if (!raw) return [];
+
+  let working = raw
+    .replace(/\n/g, ",")
+    .replace(/\//g, ",")
+    .replace(/;/g, ",")
+    .replace(/\s+\+\s+/g, ",")
+    .replace(/\s{2,}/g, " ");
+
+  const coarse = working
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  const out: string[] = [];
+
+  for (const piece of coarse) {
+    const tokens = piece.split(/\s+/).filter(Boolean);
+
+    if (tokens.length === 0) continue;
+
+    const buffer: string[] = [];
+    for (const token of tokens) {
+      if (looksLikeRoomToken(token)) {
+        if (buffer.length > 0) {
+          out.push(buffer.join(" "));
+          buffer.length = 0;
+        }
+        buffer.push(token);
+      } else {
+        buffer.push(token);
+      }
+    }
+
+    if (buffer.length > 0) {
+      out.push(buffer.join(" "));
+    }
+  }
+
+  const cleaned = out
+    .map((segment) => cleanRoom(segment))
+    .filter(Boolean);
+
+  return dedupeStrings(cleaned);
 }
 
 function parseSingleTime(piece: string): { hour: number; minute: number } | null {
@@ -177,7 +281,6 @@ function parseTimeRange(raw: string): { startTime: string; endTime: string } {
   const cleaned = raw
     .replace(/[–—]/g, "-")
     .replace(/\(.*?\)/g, "")
-    .split(",")[0]
     .trim();
 
   if (!cleaned) {
@@ -204,20 +307,22 @@ function parseTimeRange(raw: string): { startTime: string; endTime: string } {
     end = { hour: endHour, minute: endMinute };
   }
 
-  if (parts[0].toLowerCase().includes("am") && !parts[1]?.toLowerCase().includes("am") && !parts[1]?.toLowerCase().includes("pm")) {
-    const startMinutes = start.hour * 60 + start.minute;
-    const endMinutes = end.hour * 60 + end.minute;
-    if (endMinutes <= startMinutes && end.hour < 12) {
-      end.hour += 12;
-    }
+  const startRaw = parts[0].toLowerCase();
+  const endRaw = (parts[1] ?? "").toLowerCase();
+
+  const startHasMeridiem = startRaw.includes("am") || startRaw.includes("pm");
+  const endHasMeridiem = endRaw.includes("am") || endRaw.includes("pm");
+
+  const startMinutes = start.hour * 60 + start.minute;
+  let endMinutes = end.hour * 60 + end.minute;
+
+  if (!endHasMeridiem && endMinutes <= startMinutes && end.hour < 12) {
+    end.hour += 12;
+    endMinutes = end.hour * 60 + end.minute;
   }
 
-  if (!parts[0].toLowerCase().includes("am") && !parts[0].toLowerCase().includes("pm") && !parts[1]?.toLowerCase().includes("am") && !parts[1]?.toLowerCase().includes("pm")) {
-    const startMinutes = start.hour * 60 + start.minute;
-    const endMinutes = end.hour * 60 + end.minute;
-    if (endMinutes <= startMinutes && end.hour < 12) {
-      end.hour += 12;
-    }
+  if (!startHasMeridiem && !endHasMeridiem && endMinutes <= startMinutes && end.hour < 12) {
+    end.hour += 12;
   }
 
   return {
@@ -226,13 +331,88 @@ function parseTimeRange(raw: string): { startTime: string; endTime: string } {
   };
 }
 
-function shouldTreatAsSessionRow(a: string, c: string, d: string, currentDate: Date | null) {
-  if (!currentDate) return false;
-  if (!a) return false;
-  if (!c) return false;
-  if (!d) return false;
-  if (tryParseDateHeader(a)) return false;
-  return true;
+function splitTimeSegments(raw: string): string[] {
+  if (!raw) return [];
+
+  const normalized = raw
+    .replace(/\n/g, ",")
+    .replace(/;/g, ",")
+    .replace(/\s{2,}/g, " ");
+
+  const coarse = normalized
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  const timeLike = coarse.filter((piece) => /\d/.test(piece) && (piece.includes("-") || /am|pm|:\d|\b\d{3,4}\b/i.test(piece)));
+
+  return timeLike.length > 0 ? timeLike : coarse;
+}
+
+function dedupeStrings(values: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+
+  for (const value of values) {
+    const key = value.trim().toLowerCase();
+    if (!key) continue;
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(value.trim());
+    }
+  }
+
+  return out;
+}
+
+function buildSessionCombos(roomRaw: string, timeRaw: string): Array<{ roomRaw: string; timeRaw: string }> {
+  const rooms = splitRoomSegments(roomRaw);
+  const times = splitTimeSegments(timeRaw);
+
+  if (rooms.length === 0 && times.length === 0) return [];
+  if (rooms.length === 0) {
+    return times.map((time) => ({ roomRaw: "", timeRaw: time }));
+  }
+  if (times.length === 0) {
+    return rooms.map((room) => ({ roomRaw: room, timeRaw: "" }));
+  }
+
+  // 1-to-1 alignment
+  if (rooms.length === times.length) {
+    return rooms.map((room, index) => ({
+      roomRaw: room,
+      timeRaw: times[index],
+    }));
+  }
+
+  // one time, many rooms
+  if (times.length === 1 && rooms.length > 1) {
+    return rooms.map((room) => ({
+      roomRaw: room,
+      timeRaw: times[0],
+    }));
+  }
+
+  // one room, many times
+  if (rooms.length === 1 && times.length > 1) {
+    return times.map((time) => ({
+      roomRaw: rooms[0],
+      timeRaw: time,
+    }));
+  }
+
+  // fallback: pair by index, reuse last available
+  const max = Math.max(rooms.length, times.length);
+  const out: Array<{ roomRaw: string; timeRaw: string }> = [];
+
+  for (let i = 0; i < max; i += 1) {
+    out.push({
+      roomRaw: rooms[Math.min(i, rooms.length - 1)] ?? "",
+      timeRaw: times[Math.min(i, times.length - 1)] ?? "",
+    });
+  }
+
+  return out;
 }
 
 export function parseScheduleRows(rows: RowLike[]): ImportedSession[] {
@@ -259,22 +439,45 @@ export function parseScheduleRows(rows: RowLike[]): ImportedSession[] {
 
     const employees = splitEmployees(colB);
     const lead = employees[0] ?? "";
+    const combos = buildSessionCombos(colC, colD);
 
-    const { startTime, endTime } = parseTimeRange(colD);
+    if (combos.length === 0) {
+      const parsed = parseTimeRange(colD);
 
-    sessions.push({
-      id: uid("sess"),
-      date: currentDate ? formatISODate(currentDate) : "",
-      eventName: normalizeSpaces(colA),
-      room: cleanRoom(colC),
-      roomRaw: colC,
-      startTime,
-      endTime,
-      timeRaw: colD,
-      employees,
-      lead,
-      sourceRow: index + 1,
-    });
+      sessions.push({
+        id: uid("sess"),
+        date: currentDate ? formatISODate(currentDate) : "",
+        eventName: normalizeSpaces(colA),
+        room: cleanRoom(colC),
+        roomRaw: colC,
+        startTime: parsed.startTime,
+        endTime: parsed.endTime,
+        timeRaw: colD,
+        employees,
+        lead,
+        sourceRow: index + 1,
+      });
+
+      return;
+    }
+
+    for (const combo of combos) {
+      const parsed = parseTimeRange(combo.timeRaw || colD);
+
+      sessions.push({
+        id: uid("sess"),
+        date: currentDate ? formatISODate(currentDate) : "",
+        eventName: normalizeSpaces(colA),
+        room: cleanRoom(combo.roomRaw || colC),
+        roomRaw: combo.roomRaw || colC,
+        startTime: parsed.startTime,
+        endTime: parsed.endTime,
+        timeRaw: combo.timeRaw || colD,
+        employees,
+        lead,
+        sourceRow: index + 1,
+      });
+    }
   });
 
   return sessions;
@@ -331,8 +534,8 @@ export function groupSessionsIntoEvents(sessions: ImportedSession[]): ImportedEv
     event.updated_at = new Date().toISOString();
 
     event.sessions.sort((a, b) => {
-      const ad = `${a.date} ${a.startTime}`;
-      const bd = `${b.date} ${b.startTime}`;
+      const ad = `${a.date} ${a.startTime} ${a.room}`;
+      const bd = `${b.date} ${b.startTime} ${b.room}`;
       return ad.localeCompare(bd);
     });
   }
@@ -340,30 +543,6 @@ export function groupSessionsIntoEvents(sessions: ImportedSession[]): ImportedEv
   events.sort((a, b) => a.name.localeCompare(b.name));
 
   return events;
-}
-
-function safeRead<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function safeWrite(key: string, value: unknown) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(key, JSON.stringify(value));
-}
-
-function usernameFromName(name: string) {
-  const parts = normalizeSpaces(name).split(" ").filter(Boolean);
-  if (parts.length === 0) return "user";
-  if (parts.length === 1) return parts[0].toLowerCase();
-  return `${parts[0][0]}${parts[parts.length - 1]}`.toLowerCase();
 }
 
 export function mergeImportedEvents(importedEvents: ImportedEvent[]) {
