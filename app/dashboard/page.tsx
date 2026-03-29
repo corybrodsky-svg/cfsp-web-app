@@ -89,11 +89,22 @@ export default function DashboardPage() {
         <Link href="/admin" style={actionLinkStyle}>
           Open Admin Hub
         </Link>
-        <Link href="/upload-schedule" style={styles.card}>
-  <h2 style={styles.cardTitle}>Upload Schedule</h2>
-  <p style={styles.cardText}>
-    Import a full Excel schedule and auto-generate events plus Sim Op assignments.
-  </p>
+        <Link
+  href="/upload-schedule"
+  style={{
+    textDecoration: "none",
+    background: "#fff",
+    border: "1px solid #d8e0ec",
+    borderRadius: "18px",
+    padding: "20px",
+    color: "#183153",
+    boxShadow: "0 4px 16px rgba(19, 40, 72, 0.05)",
+  }}
+>
+  <h2 style={{ fontSize: "22px", fontWeight: 800 }}>
+    Upload Schedule
+  </h2>
+  <p>Import Excel schedule and auto-generate events</p>
 </Link>
       </div>
 
