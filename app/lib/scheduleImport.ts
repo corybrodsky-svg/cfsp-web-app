@@ -61,6 +61,14 @@ function safeWrite(key: string, value: unknown) {
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
+function isValidDateObject(date: Date) {
+  return !Number.isNaN(date.getTime());
+}
+
+function isISODateString(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
 function formatISODate(date: Date): string {
   const y = date.getFullYear();
   const m = `${date.getMonth() + 1}`.padStart(2, "0");
@@ -68,8 +76,25 @@ function formatISODate(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-function formatShortDate(date: Date): string {
-  return `${date.getMonth() + 1}/${date.getDate()}/${String(date.getFullYear()).slice(-2)}`;
+function formatShortDateFromISO(iso: string): string {
+  if (!isISODateString(iso)) return "";
+  const dt = new Date(`${iso}T00:00:00`);
+  if (!isValidDateObject(dt)) return "";
+  return `${dt.getMonth() + 1}/${dt.getDate()}/${String(dt.getFullYear()).slice(-2)}`;
+}
+
+function parseExcelSerialDate(value: number): Date | null {
+  const utcDays = Math.floor(value - 25569);
+  const utcValue = utcDays * 86400;
+  const dateInfo = new Date(utcValue * 1000);
+
+  if (!isValidDateObject(dateInfo)) return null;
+
+  return new Date(
+    dateInfo.getUTCFullYear(),
+    dateInfo.getUTCMonth(),
+    dateInfo.getUTCDate()
+  );
 }
 
 function canonicalizeEmployeeName(name: string): string {
@@ -86,12 +111,14 @@ function canonicalizeEmployeeName(name: string): string {
   const lower = cleaned.toLowerCase();
   if (lower === "pat") return "Patrick";
   if (lower === "jp") return "JP";
+  if (lower === "q") return "Q";
 
   return cleaned
     .split(" ")
     .map((part) => {
       if (!part) return part;
       if (part.toUpperCase() === "JP") return "JP";
+      if (part.toUpperCase() === "Q") return "Q";
       return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
     })
     .join(" ");
@@ -138,6 +165,12 @@ function tryParseDateHeader(text: string): Date | null {
   if (!value) return null;
   if (/^week\b/i.test(value)) return null;
 
+  const serial = Number(value);
+  if (!Number.isNaN(serial) && serial > 20000 && serial < 60000) {
+    const excelDate = parseExcelSerialDate(serial);
+    if (excelDate) return excelDate;
+  }
+
   const slashMatch = value.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
   if (slashMatch) {
     const month = Number(slashMatch[1]);
@@ -146,11 +179,20 @@ function tryParseDateHeader(text: string): Date | null {
     if (year < 100) year += 2000;
 
     const dt = new Date(year, month - 1, day);
-    if (!Number.isNaN(dt.getTime())) return dt;
+    if (isValidDateObject(dt)) return dt;
+  }
+
+  const slashNoYear = value.match(/(\d{1,2})\/(\d{1,2})(?!\/)/);
+  if (slashNoYear) {
+    const month = Number(slashNoYear[1]);
+    const day = Number(slashNoYear[2]);
+    const year = 2026;
+    const dt = new Date(year, month - 1, day);
+    if (isValidDateObject(dt)) return dt;
   }
 
   const direct = new Date(value);
-  if (!Number.isNaN(direct.getTime())) return direct;
+  if (isValidDateObject(direct)) return direct;
 
   return null;
 }
@@ -167,74 +209,27 @@ function shouldTreatAsSessionRow(a: string, c: string, d: string, currentDate: D
 function normalizeRoomToken(token: string): string {
   return token
     .replace(/\(.*?\)/g, "")
-    .replace(/\s+/g, "")
-    .replace(/[^A-Z0-9]/gi, "")
-    .toUpperCase()
-    .trim();
-}
-
-function looksLikeRoomToken(token: string): boolean {
-  const normalized = normalizeRoomToken(token);
-  if (!normalized) return false;
-
-  // catches things like 8E07, 8E7, 8W105, G29, 216, etc.
-  if (/^\d+[A-Z]+\d+[A-Z0-9]*$/.test(normalized)) return true;
-  if(/^[A-Z]+\d+[A-Z0-9]*$/.test(normalized)) return true;
-  if (/^\d{2,4}[A-Z]*$/.test(normalized)) return true;
-
-  return false;
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
 }
 
 function cleanRoom(raw: string): string {
-  const normalized = normalizeRoomToken(raw);
-  return normalized || normalizeSpaces(raw).toUpperCase();
+  return normalizeRoomToken(raw);
 }
 
 function splitRoomSegments(raw: string): string[] {
   if (!raw) return [];
 
-  let working = raw
+  const normalized = raw
     .replace(/\n/g, ",")
     .replace(/\//g, ",")
     .replace(/;/g, ",")
-    .replace(/\s+\+\s+/g, ",")
-    .replace(/\s{2,}/g, " ");
-
-  const coarse = working
     .split(",")
-    .map((p) => p.trim())
+    .map((part) => cleanRoom(part))
     .filter(Boolean);
 
-  const out: string[] = [];
-
-  for (const piece of coarse) {
-    const tokens = piece.split(/\s+/).filter(Boolean);
-
-    if (tokens.length === 0) continue;
-
-    const buffer: string[] = [];
-    for (const token of tokens) {
-      if (looksLikeRoomToken(token)) {
-        if (buffer.length > 0) {
-          out.push(buffer.join(" "));
-          buffer.length = 0;
-        }
-        buffer.push(token);
-      } else {
-        buffer.push(token);
-      }
-    }
-
-    if (buffer.length > 0) {
-      out.push(buffer.join(" "));
-    }
-  }
-
-  const cleaned = out
-    .map((segment) => cleanRoom(segment))
-    .filter(Boolean);
-
-  return dedupeStrings(cleaned);
+  return Array.from(new Set(normalized));
 }
 
 function parseSingleTime(piece: string): { hour: number; minute: number } | null {
@@ -307,22 +302,12 @@ function parseTimeRange(raw: string): { startTime: string; endTime: string } {
     end = { hour: endHour, minute: endMinute };
   }
 
-  const startRaw = parts[0].toLowerCase();
-  const endRaw = (parts[1] ?? "").toLowerCase();
-
-  const startHasMeridiem = startRaw.includes("am") || startRaw.includes("pm");
-  const endHasMeridiem = endRaw.includes("am") || endRaw.includes("pm");
-
   const startMinutes = start.hour * 60 + start.minute;
   let endMinutes = end.hour * 60 + end.minute;
 
-  if (!endHasMeridiem && endMinutes <= startMinutes && end.hour < 12) {
+  if (endMinutes <= startMinutes && end.hour < 12) {
     end.hour += 12;
     endMinutes = end.hour * 60 + end.minute;
-  }
-
-  if (!startHasMeridiem && !endHasMeridiem && endMinutes <= startMinutes && end.hour < 12) {
-    end.hour += 12;
   }
 
   return {
@@ -337,32 +322,11 @@ function splitTimeSegments(raw: string): string[] {
   const normalized = raw
     .replace(/\n/g, ",")
     .replace(/;/g, ",")
-    .replace(/\s{2,}/g, " ");
-
-  const coarse = normalized
     .split(",")
-    .map((p) => p.trim())
+    .map((part) => part.trim())
     .filter(Boolean);
 
-  const timeLike = coarse.filter((piece) => /\d/.test(piece) && (piece.includes("-") || /am|pm|:\d|\b\d{3,4}\b/i.test(piece)));
-
-  return timeLike.length > 0 ? timeLike : coarse;
-}
-
-function dedupeStrings(values: string[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-
-  for (const value of values) {
-    const key = value.trim().toLowerCase();
-    if (!key) continue;
-    if (!seen.has(key)) {
-      seen.add(key);
-      out.push(value.trim());
-    }
-  }
-
-  return out;
+  return normalized.length ? normalized : [raw];
 }
 
 function buildSessionCombos(roomRaw: string, timeRaw: string): Array<{ roomRaw: string; timeRaw: string }> {
@@ -370,14 +334,9 @@ function buildSessionCombos(roomRaw: string, timeRaw: string): Array<{ roomRaw: 
   const times = splitTimeSegments(timeRaw);
 
   if (rooms.length === 0 && times.length === 0) return [];
-  if (rooms.length === 0) {
-    return times.map((time) => ({ roomRaw: "", timeRaw: time }));
-  }
-  if (times.length === 0) {
-    return rooms.map((room) => ({ roomRaw: room, timeRaw: "" }));
-  }
+  if (rooms.length === 0) return times.map((time) => ({ roomRaw: "", timeRaw: time }));
+  if (times.length === 0) return rooms.map((room) => ({ roomRaw: room, timeRaw: "" }));
 
-  // 1-to-1 alignment
   if (rooms.length === times.length) {
     return rooms.map((room, index) => ({
       roomRaw: room,
@@ -385,23 +344,20 @@ function buildSessionCombos(roomRaw: string, timeRaw: string): Array<{ roomRaw: 
     }));
   }
 
-  // one time, many rooms
-  if (times.length === 1 && rooms.length > 1) {
+  if (times.length === 1) {
     return rooms.map((room) => ({
       roomRaw: room,
       timeRaw: times[0],
     }));
   }
 
-  // one room, many times
-  if (rooms.length === 1 && times.length > 1) {
+  if (rooms.length === 1) {
     return times.map((time) => ({
       roomRaw: rooms[0],
       timeRaw: time,
     }));
   }
 
-  // fallback: pair by index, reuse last available
   const max = Math.max(rooms.length, times.length);
   const out: Array<{ roomRaw: string; timeRaw: string }> = [];
 
@@ -413,6 +369,15 @@ function buildSessionCombos(roomRaw: string, timeRaw: string): Array<{ roomRaw: 
   }
 
   return out;
+}
+
+function getEventEarliestISO(event: ImportedEvent): string {
+  const validDates = (event.sessions || [])
+    .map((session) => session.date)
+    .filter((date) => isISODateString(date))
+    .sort();
+
+  return validDates[0] || "9999-12-31";
 }
 
 export function parseScheduleRows(rows: RowLike[]): ImportedSession[] {
@@ -497,7 +462,7 @@ export function groupSessionsIntoEvents(sessions: ImportedSession[]): ImportedEv
         date_text: "",
         sp_needed: 0,
         sp_assigned: 0,
-        notes: "Imported from Spring schedule uploader",
+        notes: "",
         updated_at: new Date().toISOString(),
         assignedSimOps: [],
         leadSimOps: [],
@@ -522,15 +487,19 @@ export function groupSessionsIntoEvents(sessions: ImportedSession[]): ImportedEv
   const events = Array.from(map.values());
 
   for (const event of events) {
-    const dateSet = new Set(event.sessions.map((s) => s.date));
-    const prettyDates = Array.from(dateSet)
-      .sort()
-      .map((iso) => {
-        const dt = new Date(`${iso}T00:00:00`);
-        return formatShortDate(dt);
-      });
+    const validISO = Array.from(
+      new Set(
+        event.sessions
+          .map((s) => s.date)
+          .filter((date) => isISODateString(date))
+      )
+    ).sort();
 
-    event.date_text = prettyDates.join(", ");
+    const prettyDates = validISO
+      .map((iso) => formatShortDateFromISO(iso))
+      .filter(Boolean);
+
+    event.date_text = prettyDates.length ? prettyDates.join(", ") : "Date TBD";
     event.updated_at = new Date().toISOString();
 
     event.sessions.sort((a, b) => {
@@ -540,7 +509,12 @@ export function groupSessionsIntoEvents(sessions: ImportedSession[]): ImportedEv
     });
   }
 
-  events.sort((a, b) => a.name.localeCompare(b.name));
+  events.sort((a, b) => {
+    const aDate = getEventEarliestISO(a);
+    const bDate = getEventEarliestISO(b);
+    if (aDate !== bDate) return aDate.localeCompare(bDate);
+    return a.name.localeCompare(b.name);
+  });
 
   return events;
 }
@@ -564,15 +538,31 @@ export function mergeImportedEvents(importedEvents: ImportedEvent[]) {
         status: existing.status ?? imported.status,
         sp_needed: existing.sp_needed ?? 0,
         sp_assigned: existing.sp_assigned ?? 0,
-        notes: existing.notes
-          ? `${existing.notes}\n\nImported schedule refreshed ${new Date().toLocaleString()}`
-          : imported.notes,
+        notes: existing.notes ?? "",
         updated_at: new Date().toISOString(),
       };
     } else {
-      merged.unshift(imported);
+      merged.push(imported);
     }
   }
+
+  merged.sort((a, b) => {
+    const aSessions = Array.isArray(a.sessions) ? a.sessions : [];
+    const bSessions = Array.isArray(b.sessions) ? b.sessions : [];
+
+    const aDate = aSessions
+      .map((s: any) => String(s?.date || ""))
+      .filter((d: string) => isISODateString(d))
+      .sort()[0] || "9999-12-31";
+
+    const bDate = bSessions
+      .map((s: any) => String(s?.date || ""))
+      .filter((d: string) => isISODateString(d))
+      .sort()[0] || "9999-12-31";
+
+    if (aDate !== bDate) return aDate.localeCompare(bDate);
+    return String(a.name || "").localeCompare(String(b.name || ""));
+  });
 
   safeWrite(EVENTS_KEY, merged);
   return merged;

@@ -187,24 +187,42 @@ export default function EventsPage() {
   }
 
   const filteredEvents = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return events;
+  const q = query.trim().toLowerCase();
 
-    return events.filter((event) => {
-      const simOps = summarizeSimOps(event).join(" ").toLowerCase();
-      const rooms = summarizeRooms(event).join(" ").toLowerCase();
-      const leads = summarizeLeads(event).join(" ").toLowerCase();
+  const base = events.filter((event) => {
+    const simOps = summarizeSimOps(event).join(" ").toLowerCase();
+    const rooms = summarizeRooms(event).join(" ").toLowerCase();
+    const leads = summarizeLeads(event).join(" ").toLowerCase();
 
-      return (
-        event.name.toLowerCase().includes(q) ||
-        event.status.toLowerCase().includes(q) ||
-        String(event.date_text || "").toLowerCase().includes(q) ||
-        simOps.includes(q) ||
-        rooms.includes(q) ||
-        leads.includes(q)
-      );
-    });
-  }, [events, query]);
+    if (!q) return true;
+
+    return (
+      event.name.toLowerCase().includes(q) ||
+      event.status.toLowerCase().includes(q) ||
+      String(event.date_text || "").toLowerCase().includes(q) ||
+      simOps.includes(q) ||
+      rooms.includes(q) ||
+      leads.includes(q)
+    );
+  });
+
+  return [...base].sort((a, b) => {
+    const aDate =
+      (a.sessions || [])
+        .map((session) => String(session.date || ""))
+        .filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date))
+        .sort()[0] || "9999-12-31";
+
+    const bDate =
+      (b.sessions || [])
+        .map((session) => String(session.date || ""))
+        .filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date))
+        .sort()[0] || "9999-12-31";
+
+    if (aDate !== bDate) return aDate.localeCompare(bDate);
+    return a.name.localeCompare(b.name);
+  });
+}, [events, query]);
 
   const summary = useMemo(() => {
     const total = events.length;
