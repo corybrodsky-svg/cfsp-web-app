@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { clearSession, DemoUser, getSession } from "../../lib/demoAuth";
+import { ... } from "../lib/demoAuth";
 
 export default function ProfilePage() {
   const [user, setUser] = useState<DemoUser | null>(null);
