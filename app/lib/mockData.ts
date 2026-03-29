@@ -3,8 +3,6 @@ export type VisibilityType = "Team" | "Personal";
 export type PoolType = "CICSP" | "Elkins Park" | "Both";
 export type UserRole = "sp" | "sim_op";
 
-export type StaffRelationship = "Lead" | "Assigned" | "Associated";
-
 export type EventItem = {
   id: string;
   name: string;
@@ -45,7 +43,20 @@ export type SimOpItem = {
   role: "sim_op";
 };
 
+export type AssignmentDraft = {
+  id: string;
+  spId: string;
+  spName: string;
+  eventMode: "existing" | "placeholder";
+  eventId?: string;
+  eventName: string;
+  dateText?: string;
+  notes?: string;
+  createdAt: string;
+};
+
 export const DEFAULT_PASSWORD = "Drexel1$";
+export const ASSIGNMENT_STORAGE_KEY = "cfsp_assignment_drafts";
 
 export function slugify(value: string) {
   return value
@@ -174,13 +185,6 @@ export function resolveSimOpName(value: string) {
   return found?.fullName || value;
 }
 
-export function isSimOpName(value: string) {
-  const normalized = normalizePersonName(value);
-  return simOps.some((person) =>
-    person.aliases.some((alias) => normalizePersonName(alias) === normalized)
-  );
-}
-
 export const events: EventItem[] = [
   {
     id: "n651-virtual",
@@ -273,16 +277,49 @@ export const sps: SPItem[] = [
   },
 ];
 
-export type AssignmentDraft = {
-  id: string;
-  spId: string;
-  spName: string;
-  eventMode: "existing" | "placeholder";
-  eventId?: string;
-  eventName: string;
-  dateText?: string;
-  notes?: string;
-  createdAt: string;
-};
+export function getStoredAssignments(): AssignmentDraft[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(ASSIGNMENT_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
-export const ASSIGNMENT_STORAGE_KEY = "cfsp_assignment_drafts";
+export function saveStoredAssignments(assignments: AssignmentDraft[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(
+    ASSIGNMENT_STORAGE_KEY,
+    JSON.stringify(assignments)
+  );
+}
+
+export function addOrReplaceAssignment(draft: AssignmentDraft) {
+  const existing = getStoredAssignments();
+
+  const filtered = existing.filter((item) => {
+    if (draft.eventMode === "existing" && item.eventMode === "existing") {
+      return !(item.spId === draft.spId && item.eventId === draft.eventId);
+    }
+
+    if (draft.eventMode === "placeholder" && item.eventMode === "placeholder") {
+      return !(
+        item.spId === draft.spId &&
+        item.eventName.trim().toLowerCase() === draft.eventName.trim().toLowerCase()
+      );
+    }
+
+    return true;
+  });
+
+  const next = [draft, ...filtered];
+  saveStoredAssignments(next);
+  return next;
+}
+
+export function getSPById(spId: string) {
+  return sps.find((sp) => sp.id === spId);
+}

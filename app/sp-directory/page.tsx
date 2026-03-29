@@ -3,10 +3,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  ASSIGNMENT_STORAGE_KEY,
+  addOrReplaceAssignment,
   AssignmentDraft,
   buildUsername,
+  DEFAULT_PASSWORD,
   events,
+  getStoredAssignments,
   PoolType,
   sps as mockSPs,
 } from "../lib/mockData";
@@ -53,12 +55,9 @@ type DirectorySP = {
   pool: PoolType;
 };
 
-const DEFAULT_PASSWORD = "Drexel1$";
-
 const pageStyle: React.CSSProperties = {
   minHeight: "100vh",
-  background:
-    "linear-gradient(135deg, #f4f7fb 0%, #e8eef7 45%, #dfe8f5 100%)",
+  background: "linear-gradient(135deg, #eef4fb 0%, #dde8f5 100%)",
   padding: "28px",
 };
 
@@ -67,76 +66,84 @@ const shellStyle: React.CSSProperties = {
   margin: "0 auto",
 };
 
-const topRowStyle: React.CSSProperties = {
+const heroStyle: React.CSSProperties = {
+  background: "linear-gradient(135deg, #173d70 0%, #1f4e8d 100%)",
+  color: "#ffffff",
+  borderRadius: "24px",
+  padding: "28px",
+  boxShadow: "0 18px 40px rgba(18, 35, 63, 0.22)",
+  marginBottom: "18px",
+};
+
+const heroTopStyle: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
-  alignItems: "flex-start",
   gap: "16px",
   flexWrap: "wrap",
-  marginBottom: "20px",
+  alignItems: "flex-start",
 };
 
 const titleStyle: React.CSSProperties = {
   margin: 0,
-  fontSize: "30px",
-  fontWeight: 800,
-  color: "#12233f",
+  fontSize: "34px",
+  fontWeight: 900,
 };
 
 const subtitleStyle: React.CSSProperties = {
   marginTop: "8px",
-  color: "#62748d",
+  color: "rgba(255,255,255,0.82)",
   fontSize: "15px",
 };
 
 const actionRowStyle: React.CSSProperties = {
   display: "flex",
-  gap: "12px",
+  gap: "10px",
   flexWrap: "wrap",
 };
 
-const primaryLinkStyle: React.CSSProperties = {
+const lightButtonStyle: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
   textDecoration: "none",
   padding: "12px 16px",
-  borderRadius: "12px",
-  background: "#173d70",
-  color: "#ffffff",
-  fontWeight: 800,
-};
-
-const secondaryLinkStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  textDecoration: "none",
-  padding: "12px 16px",
-  borderRadius: "12px",
+  borderRadius: "14px",
   background: "#ffffff",
-  border: "1px solid #d0dae8",
   color: "#173d70",
   fontWeight: 800,
+  border: "1px solid rgba(255,255,255,0.2)",
+};
+
+const darkButtonStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  textDecoration: "none",
+  padding: "12px 16px",
+  borderRadius: "14px",
+  background: "rgba(255,255,255,0.15)",
+  color: "#ffffff",
+  fontWeight: 800,
+  border: "1px solid rgba(255,255,255,0.22)",
 };
 
 const toolbarStyle: React.CSSProperties = {
   background: "#ffffff",
-  border: "1px solid #d9e3f1",
-  borderRadius: "18px",
+  border: "1px solid #d8e3f1",
+  borderRadius: "20px",
   padding: "18px",
-  boxShadow: "0 10px 26px rgba(20, 40, 90, 0.08)",
+  boxShadow: "0 12px 28px rgba(20, 40, 90, 0.08)",
   marginBottom: "18px",
 };
 
 const searchStyle: React.CSSProperties = {
   width: "100%",
-  padding: "14px 16px",
-  borderRadius: "12px",
-  border: "1px solid #cfd7e6",
+  padding: "16px 18px",
+  borderRadius: "16px",
+  border: "1px solid #cfd9e8",
   fontSize: "15px",
-  background: "#fbfcfe",
   boxSizing: "border-box",
+  background: "#fbfdff",
 };
 
 const filterRowStyle: React.CSSProperties = {
@@ -147,13 +154,13 @@ const filterRowStyle: React.CSSProperties = {
 };
 
 const pillStyle: React.CSSProperties = {
-  padding: "7px 11px",
+  padding: "8px 12px",
   borderRadius: "999px",
-  background: "#f2f6fc",
-  border: "1px solid #d9e3f1",
+  background: "#f3f7fc",
+  border: "1px solid #d7e1ee",
   fontSize: "13px",
-  fontWeight: 700,
-  color: "#334155",
+  fontWeight: 800,
+  color: "#35506f",
   cursor: "pointer",
 };
 
@@ -166,15 +173,15 @@ const activePillStyle: React.CSSProperties = {
 
 const gridStyle: React.CSSProperties = {
   display: "grid",
-  gap: "16px",
+  gap: "18px",
 };
 
 const cardStyle: React.CSSProperties = {
   background: "#ffffff",
-  borderRadius: "18px",
-  padding: "20px",
+  borderRadius: "22px",
+  padding: "22px",
   border: "1px solid #d9e3f1",
-  boxShadow: "0 10px 26px rgba(20, 40, 90, 0.08)",
+  boxShadow: "0 14px 28px rgba(20, 40, 90, 0.08)",
 };
 
 const cardTopStyle: React.CSSProperties = {
@@ -187,8 +194,8 @@ const cardTopStyle: React.CSSProperties = {
 
 const nameStyle: React.CSSProperties = {
   margin: 0,
-  fontSize: "24px",
-  fontWeight: 800,
+  fontSize: "26px",
+  fontWeight: 900,
   color: "#12233f",
 };
 
@@ -204,7 +211,7 @@ const badgeStyle: React.CSSProperties = {
   justifyContent: "center",
   padding: "8px 12px",
   borderRadius: "999px",
-  background: "#eef4fb",
+  background: "#edf4fb",
   border: "1px solid #d9e3f1",
   color: "#173d70",
   fontWeight: 800,
@@ -215,19 +222,19 @@ const infoGridStyle: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
   gap: "12px",
-  marginTop: "14px",
+  marginTop: "16px",
 };
 
 const infoCardStyle: React.CSSProperties = {
   border: "1px solid #dde6f2",
-  borderRadius: "14px",
+  borderRadius: "16px",
   padding: "14px",
   background: "#f8fbff",
 };
 
 const labelStyle: React.CSSProperties = {
   fontSize: "12px",
-  fontWeight: 800,
+  fontWeight: 900,
   letterSpacing: "0.05em",
   textTransform: "uppercase",
   color: "#6b7c93",
@@ -245,17 +252,17 @@ const valueStyle: React.CSSProperties = {
 const noteBlockStyle: React.CSSProperties = {
   marginTop: "14px",
   border: "1px solid #dde6f2",
-  borderRadius: "14px",
+  borderRadius: "16px",
   padding: "14px",
   background: "#fcfdff",
 };
 
 const assignPanelStyle: React.CSSProperties = {
-  marginTop: "16px",
-  border: "1px solid #d9e3f1",
-  borderRadius: "14px",
+  marginTop: "18px",
+  border: "1px solid #dce6f2",
+  borderRadius: "18px",
   padding: "16px",
-  background: "#f8fbff",
+  background: "linear-gradient(180deg, #f8fbff 0%, #f1f7fd 100%)",
 };
 
 const buttonRowStyle: React.CSSProperties = {
@@ -271,7 +278,7 @@ const buttonStyle: React.CSSProperties = {
   border: "1px solid #cdd8e8",
   background: "#ffffff",
   cursor: "pointer",
-  fontWeight: 700,
+  fontWeight: 800,
   color: "#173d70",
 };
 
@@ -416,7 +423,6 @@ export default function SPDirectoryPage() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [poolFilter, setPoolFilter] = useState<"All" | PoolType>("All");
-
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [assignMode, setAssignMode] = useState<"existing" | "placeholder">("existing");
   const [selectedEventId, setSelectedEventId] = useState(events[0]?.id || "");
@@ -424,6 +430,11 @@ export default function SPDirectoryPage() {
   const [placeholderDate, setPlaceholderDate] = useState("");
   const [assignmentNote, setAssignmentNote] = useState("");
   const [savedMessage, setSavedMessage] = useState("");
+  const [assignments, setAssignments] = useState<AssignmentDraft[]>([]);
+
+  useEffect(() => {
+    setAssignments(getStoredAssignments());
+  }, []);
 
   useEffect(() => {
     async function loadCSV() {
@@ -436,9 +447,7 @@ export default function SPDirectoryPage() {
         });
 
         if (!response.ok) {
-          throw new Error(
-            "Could not load /cfsp_sps_import_v3.csv from the public folder."
-          );
+          throw new Error("Could not load /cfsp_sps_import_v3.csv.");
         }
 
         const text = await response.text();
@@ -446,8 +455,38 @@ export default function SPDirectoryPage() {
         setRows(parsedRows);
       } catch (error) {
         console.error(error);
+
+        const fallbackRows = mockSPs.map((sp) => {
+          const [firstName = "", ...rest] = sp.fullName.split(" ");
+          const lastName = rest.join(" ");
+
+          return {
+            id: sp.id,
+            firstName,
+            lastName,
+            fullName: sp.fullName,
+            workingEmail: sp.email,
+            secondaryEmail: "",
+            phone: sp.phone,
+            secondaryPhone: "",
+            portrayalAge: sp.portrayalAge,
+            race: sp.raceSex.split("/")[0]?.trim() || "",
+            sex: sp.raceSex.split("/")[1]?.trim() || "",
+            doNotHireFor: "",
+            telehealth: "",
+            ptPreferred: "",
+            otherRoles: "",
+            birthYear: "",
+            speaksSpanish: "",
+            username: sp.username,
+            defaultPassword: sp.defaultPassword,
+            pool: sp.pool,
+          } satisfies DirectorySP;
+        });
+
+        setRows(fallbackRows);
         setErrorMessage(
-          "SP CSV not found yet. Put cfsp_sps_import_v3.csv into your public folder."
+          "CSV not found in public folder. Showing fallback directory data for now."
         );
       } finally {
         setLoading(false);
@@ -493,9 +532,16 @@ export default function SPDirectoryPage() {
     });
   }, [rows, query, poolFilter]);
 
+  function assignmentCountForSP(spId: string) {
+    return assignments.filter((item) => item.spId === spId).length;
+  }
+
   function saveAssignment(sp: DirectorySP) {
-    const existingRaw = localStorage.getItem(ASSIGNMENT_STORAGE_KEY);
-    const existing: AssignmentDraft[] = existingRaw ? JSON.parse(existingRaw) : [];
+    if (assignMode === "placeholder" && !placeholderName.trim()) {
+      setSavedMessage("Placeholder event name is required.");
+      setTimeout(() => setSavedMessage(""), 2200);
+      return;
+    }
 
     const selectedEvent = events.find((event) => event.id === selectedEventId);
 
@@ -508,52 +554,47 @@ export default function SPDirectoryPage() {
       eventName:
         assignMode === "existing"
           ? selectedEvent?.name || "Unknown Event"
-          : placeholderName || "Untitled Placeholder Event",
+          : placeholderName.trim(),
       dateText:
         assignMode === "existing"
           ? selectedEvent?.dateText || ""
-          : placeholderDate || "",
-      notes: assignmentNote,
+          : placeholderDate.trim(),
+      notes: assignmentNote.trim(),
       createdAt: new Date().toISOString(),
     };
 
-    localStorage.setItem(
-      ASSIGNMENT_STORAGE_KEY,
-      JSON.stringify([draft, ...existing])
-    );
-
-    setSavedMessage(
-      `${sp.fullName} assigned to ${
-        draft.eventName
-      } (${draft.eventMode === "existing" ? "existing event" : "placeholder event"})`
-    );
+    const next = addOrReplaceAssignment(draft);
+    setAssignments(next);
+    setSavedMessage(`${sp.fullName} assigned to ${draft.eventName}.`);
     setAssignmentNote("");
     setPlaceholderName("");
     setPlaceholderDate("");
-    setTimeout(() => setSavedMessage(""), 2500);
+    setTimeout(() => setSavedMessage(""), 2200);
   }
 
   return (
     <div style={pageStyle}>
       <div style={shellStyle}>
-        <div style={topRowStyle}>
-          <div>
-            <h1 style={titleStyle}>SP Directory</h1>
-            <div style={subtitleStyle}>
-              Search, filter, and assign standardized patients.
+        <div style={heroStyle}>
+          <div style={heroTopStyle}>
+            <div>
+              <h1 style={titleStyle}>SP Directory</h1>
+              <div style={subtitleStyle}>
+                Search, filter, assign, and manage standardized patients.
+              </div>
             </div>
-          </div>
 
-          <div style={actionRowStyle}>
-            <Link href="/admin" style={secondaryLinkStyle}>
-              Admin
-            </Link>
-            <Link href="/events" style={secondaryLinkStyle}>
-              Events
-            </Link>
-            <Link href="/login" style={primaryLinkStyle}>
-              Login
-            </Link>
+            <div style={actionRowStyle}>
+              <Link href="/admin" style={lightButtonStyle}>
+                Admin
+              </Link>
+              <Link href="/events" style={lightButtonStyle}>
+                Events
+              </Link>
+              <Link href="/login" style={darkButtonStyle}>
+                Login
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -582,7 +623,7 @@ export default function SPDirectoryPage() {
           <div style={filterRowStyle}>
             <span style={pillStyle}>Loaded: {loading ? "..." : rows.length}</span>
             <span style={pillStyle}>Showing: {loading ? "..." : filtered.length}</span>
-            <span style={pillStyle}>Assignments save to localStorage</span>
+            <span style={pillStyle}>Assignments: {assignments.length}</span>
           </div>
         </div>
 
@@ -590,25 +631,14 @@ export default function SPDirectoryPage() {
           <div style={{ ...cardStyle, marginBottom: "16px" }}>{savedMessage}</div>
         ) : null}
 
+        {errorMessage ? (
+          <div style={{ ...cardStyle, marginBottom: "16px" }}>{errorMessage}</div>
+        ) : null}
+
         {loading ? (
           <div style={cardStyle}>Loading SP directory...</div>
-        ) : errorMessage ? (
-          <div style={cardStyle}>
-            <h3 style={{ marginTop: 0, color: "#12233f" }}>CSV not loaded yet</h3>
-            <p style={{ color: "#475569", lineHeight: 1.6 }}>{errorMessage}</p>
-            <p style={{ color: "#475569", lineHeight: 1.6, marginBottom: 0 }}>
-              Put your file in:
-              <br />
-              <strong>public/cfsp_sps_import_v3.csv</strong>
-            </p>
-          </div>
         ) : filtered.length === 0 ? (
-          <div style={cardStyle}>
-            <h3 style={{ marginTop: 0, color: "#12233f" }}>No results</h3>
-            <p style={{ color: "#475569", marginBottom: 0 }}>
-              Try a broader search term.
-            </p>
-          </div>
+          <div style={cardStyle}>No results found.</div>
         ) : (
           <div style={gridStyle}>
             {filtered.map((sp) => (
@@ -619,6 +649,9 @@ export default function SPDirectoryPage() {
                   <div style={badgeRowStyle}>
                     <div style={badgeStyle}>{sp.pool}</div>
                     <div style={badgeStyle}>{sp.portrayalAge || "Age N/A"}</div>
+                    <div style={badgeStyle}>
+                      {assignmentCountForSP(sp.id)} assigned
+                    </div>
                   </div>
                 </div>
 
@@ -697,7 +730,7 @@ export default function SPDirectoryPage() {
                 <div style={buttonRowStyle}>
                   <button
                     type="button"
-                    style={secondaryLinkStyle}
+                    style={buttonStyle}
                     onClick={() =>
                       setExpandedId(expandedId === sp.id ? null : sp.id)
                     }
@@ -711,11 +744,7 @@ export default function SPDirectoryPage() {
                     <div style={filterRowStyle}>
                       <button
                         type="button"
-                        style={
-                          assignMode === "existing"
-                            ? activePillStyle
-                            : pillStyle
-                        }
+                        style={assignMode === "existing" ? activePillStyle : pillStyle}
                         onClick={() => setAssignMode("existing")}
                       >
                         Existing Event
@@ -723,11 +752,7 @@ export default function SPDirectoryPage() {
 
                       <button
                         type="button"
-                        style={
-                          assignMode === "placeholder"
-                            ? activePillStyle
-                            : pillStyle
-                        }
+                        style={assignMode === "placeholder" ? activePillStyle : pillStyle}
                         onClick={() => setAssignMode("placeholder")}
                       >
                         Placeholder Event
@@ -789,7 +814,7 @@ export default function SPDirectoryPage() {
                         style={primaryButtonStyle}
                         onClick={() => saveAssignment(sp)}
                       >
-                        Save Assignment Draft
+                        Save Assignment
                       </button>
                     </div>
                   </div>
