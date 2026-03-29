@@ -1,222 +1,297 @@
 "use client";
 
-import React from "react";
 import Link from "next/link";
-import { events } from "../../lib/mockData";
+import { useParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
-const pageStyle: React.CSSProperties = {
-  minHeight: "100vh",
-  background:
-    "linear-gradient(135deg, #f4f7fb 0%, #e8eef7 45%, #dfe8f5 100%)",
-  padding: "28px",
+type ImportedSession = {
+  id?: string;
+  date?: string;
+  room?: string;
+  roomRaw?: string;
+  startTime?: string;
+  endTime?: string;
+  employees?: string[];
+  lead?: string;
 };
 
-const shellStyle: React.CSSProperties = {
-  maxWidth: "1000px",
-  margin: "0 auto",
+type EventItem = {
+  id: string;
+  name: string;
+  status: string;
+  date_text: string;
+  sp_needed: number;
+  sp_assigned: number;
+  updated_at: string;
+  assignedSimOps?: string[];
+  leadSimOps?: string[];
+  sessions?: ImportedSession[];
 };
 
-const topRowStyle: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "flex-start",
-  gap: "16px",
-  flexWrap: "wrap",
-  marginBottom: "20px",
-};
+const STORAGE_KEY = "cfsp_events_v1";
+const navy = "#163a70";
+const blue = "#1E5AA8";
+const green = "#2E8B57";
+const border = "#d9e2ef";
+const slate = "#5f6f86";
+const white = "#ffffff";
 
-const titleStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: "32px",
-  fontWeight: 800,
-  color: "#12233f",
-};
+function loadEvents(): EventItem[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
-const subtitleStyle: React.CSSProperties = {
-  marginTop: "8px",
-  color: "#62748d",
-  fontSize: "15px",
-};
+function getDisplayDates(event: EventItem) {
+  const validISO = Array.from(
+    new Set(
+      (event.sessions || [])
+        .map((session) => String(session.date || ""))
+        .filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date))
+    )
+  ).sort();
 
-const badgeStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "10px 14px",
-  borderRadius: "999px",
-  background: "#eef4fb",
-  border: "1px solid #d9e3f1",
-  color: "#173d70",
-  fontWeight: 800,
-  fontSize: "14px",
-};
+  const pretty = validISO
+    .map((iso) => {
+      const dt = new Date(`${iso}T00:00:00`);
+      if (Number.isNaN(dt.getTime())) return "";
+      return `${dt.getMonth() + 1}/${dt.getDate()}/${String(dt.getFullYear()).slice(-2)}`;
+    })
+    .filter(Boolean);
 
-const gridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-  gap: "14px",
-  marginBottom: "16px",
-};
+  return pretty.length ? pretty.join(", ") : "Date TBD";
+}
 
-const sectionStyle: React.CSSProperties = {
-  background: "#ffffff",
-  border: "1px solid #d9e3f1",
-  borderRadius: "18px",
-  padding: "18px",
-  boxShadow: "0 10px 26px rgba(20, 40, 90, 0.08)",
-};
+function formatSessionDate(value?: string) {
+  if (!value) return "TBD";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const dt = new Date(`${value}T00:00:00`);
+    if (!Number.isNaN(dt.getTime())) {
+      return `${dt.getMonth() + 1}/${dt.getDate()}/${String(dt.getFullYear()).slice(-2)}`;
+    }
+  }
+  return "TBD";
+}
 
-const labelStyle: React.CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 800,
-  letterSpacing: "0.06em",
-  textTransform: "uppercase",
-  color: "#6c7d94",
-  marginBottom: "8px",
-};
+export default function EventDetailPage() {
+  const params = useParams<{ id: string }>();
+  const [events, setEvents] = useState<EventItem[]>([]);
 
-const valueStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: "19px",
-  color: "#12233f",
-  fontWeight: 700,
-};
+  useEffect(() => {
+    setEvents(loadEvents());
+  }, []);
 
-const notesStyle: React.CSSProperties = {
-  ...sectionStyle,
-  lineHeight: 1.7,
-};
-
-const actionRowStyle: React.CSSProperties = {
-  display: "flex",
-  gap: "12px",
-  flexWrap: "wrap",
-  marginTop: "18px",
-};
-
-const primaryLinkStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  textDecoration: "none",
-  padding: "12px 16px",
-  borderRadius: "12px",
-  background: "#173d70",
-  color: "#ffffff",
-  fontWeight: 800,
-};
-
-const secondaryLinkStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  textDecoration: "none",
-  padding: "12px 16px",
-  borderRadius: "12px",
-  background: "#ffffff",
-  border: "1px solid #d0dae8",
-  color: "#173d70",
-  fontWeight: 800,
-};
-
-type EventDetailPageProps = {
-  params: { id: string };
-};
-
-export default function EventDetailPage({ params }: EventDetailPageProps) {
-  const event = events.find((item) => item.id === params.id);
+  const event = useMemo(
+    () => events.find((item) => item.id === params.id),
+    [events, params.id]
+  );
 
   if (!event) {
     return (
-      <div style={pageStyle}>
-        <div style={shellStyle}>
-          <div style={sectionStyle}>
-            <h1 style={titleStyle}>Event Not Found</h1>
-            <div style={subtitleStyle}>
-              This event id does not match the current dataset.
-            </div>
-
-            <div style={{ marginTop: "16px", color: "#334155" }}>
-              <strong>Requested ID:</strong> {params.id}
-            </div>
-
-            <div style={actionRowStyle}>
-              <Link href="/events" style={primaryLinkStyle}>
-                Back to Events
-              </Link>
-              <Link href="/" style={secondaryLinkStyle}>
-                Back to Dashboard
-              </Link>
-            </div>
-          </div>
+      <div
+        style={{
+          background: white,
+          border: `1px solid ${border}`,
+          borderRadius: 24,
+          padding: 24,
+          display: "grid",
+          gap: 16,
+        }}
+      >
+        <div style={{ fontSize: 34, fontWeight: 900, color: navy }}>Event Not Found</div>
+        <div style={{ fontSize: 15, color: slate }}>
+          This event id does not match the current dataset.
+        </div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <Link href="/events" style={linkBtn}>
+            Back to Events
+          </Link>
+          <Link href="/dashboard" style={linkBtn}>
+            Back to Dashboard
+          </Link>
         </div>
       </div>
     );
   }
 
+  const simOps = event.assignedSimOps || [];
+  const leads = event.leadSimOps || [];
+  const sessions = event.sessions || [];
+
   return (
-    <div style={pageStyle}>
-      <div style={shellStyle}>
-        <div style={topRowStyle}>
+    <div style={{ display: "grid", gap: 20 }}>
+      <section
+        style={{
+          background: white,
+          border: `1px solid ${border}`,
+          borderRadius: 24,
+          padding: 24,
+          display: "grid",
+          gap: 14,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div>
-            <h1 style={titleStyle}>{event.name}</h1>
-            <div style={subtitleStyle}>Event detail page</div>
+            <div style={{ fontSize: 34, fontWeight: 900, color: navy }}>{event.name}</div>
+            <div style={{ fontSize: 14, color: slate, marginTop: 8 }}>
+              Last updated: {new Date(event.updated_at).toLocaleString()}
+            </div>
           </div>
 
-          <div style={badgeStyle}>{event.status}</div>
-        </div>
-
-        <div style={gridStyle}>
-          <div style={sectionStyle}>
-            <div style={labelStyle}>Dates</div>
-            <p style={valueStyle}>{event.dateText}</p>
-          </div>
-
-          <div style={sectionStyle}>
-            <div style={labelStyle}>Location</div>
-            <p style={valueStyle}>{event.location}</p>
-          </div>
-
-          <div style={sectionStyle}>
-            <div style={labelStyle}>Visibility</div>
-            <p style={valueStyle}>{event.visibility}</p>
-          </div>
-
-          <div style={sectionStyle}>
-            <div style={labelStyle}>SP Needed</div>
-            <p style={valueStyle}>{event.spNeeded}</p>
-          </div>
-
-          <div style={sectionStyle}>
-            <div style={labelStyle}>SP Assigned</div>
-            <p style={valueStyle}>{event.spAssigned}</p>
-          </div>
-
-          <div style={sectionStyle}>
-            <div style={labelStyle}>Shortage</div>
-            <p style={valueStyle}>
-              {Math.max(event.spNeeded - event.spAssigned, 0)}
-            </p>
+          <div
+            style={{
+              borderRadius: 999,
+              padding: "10px 14px",
+              border: `1px solid ${border}`,
+              background: "#edf4ff",
+              color: blue,
+              fontWeight: 800,
+              height: "fit-content",
+            }}
+          >
+            {event.status}
           </div>
         </div>
 
-        <div style={notesStyle}>
-          <div style={labelStyle}>Notes</div>
-          <p style={{ margin: 0, color: "#334155" }}>{event.notes}</p>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gap: 14,
+          }}
+        >
+          {[
+            { label: "Dates", value: getDisplayDates(event) },
+            { label: "Sessions", value: sessions.length },
+            { label: "Rooms", value: new Set(sessions.map((s) => s.room || s.roomRaw || "")).size },
+            { label: "SP Coverage", value: `${event.sp_assigned} / ${event.sp_needed}` },
+          ].map((item) => (
+            <div
+              key={item.label}
+              style={{
+                background: "#f8fbff",
+                border: `1px solid #e4edf7`,
+                borderRadius: 16,
+                padding: 16,
+              }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 800, color: slate }}>{item.label}</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: navy, marginTop: 8 }}>
+                {item.value}
+              </div>
+            </div>
+          ))}
         </div>
 
-        <div style={actionRowStyle}>
-          <Link href="/events" style={primaryLinkStyle}>
-            ← Back to Events
-          </Link>
-          <Link href="/events/new" style={secondaryLinkStyle}>
-            Create Another Event
-          </Link>
-          <Link href="/" style={secondaryLinkStyle}>
-            Dashboard
-          </Link>
+        <div style={{ display: "grid", gap: 8, fontSize: 15, color: navy }}>
+          <div><strong>Assigned Sim Ops:</strong> {simOps.length ? simOps.join(", ") : "None shown"}</div>
+          <div><strong>Lead(s):</strong> {leads.length ? leads.join(", ") : "None shown"}</div>
         </div>
-      </div>
+
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <Link href="/events" style={primaryBtn}>Back to Events</Link>
+          <Link href="/upload-schedule" style={secondaryBtn}>Upload Schedule</Link>
+        </div>
+      </section>
+
+      <section
+        style={{
+          background: white,
+          border: `1px solid ${border}`,
+          borderRadius: 24,
+          padding: 24,
+          display: "grid",
+          gap: 14,
+        }}
+      >
+        <div style={{ fontSize: 22, fontWeight: 900, color: navy }}>Session Schedule</div>
+
+        <div
+          style={{
+            overflowX: "auto",
+            border: `1px solid ${border}`,
+            borderRadius: 14,
+          }}
+        >
+          <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff" }}>
+            <thead>
+              <tr>
+                {["Date", "Start", "End", "Room", "Lead", "Assigned"].map((label) => (
+                  <th
+                    key={label}
+                    style={{
+                      textAlign: "left",
+                      padding: "12px 10px",
+                      background: "#f8fbff",
+                      borderBottom: `1px solid ${border}`,
+                      fontSize: 13,
+                      color: slate,
+                    }}
+                  >
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sessions.map((session, index) => (
+                <tr key={session.id || `${event.id}-${index}`}>
+                  <td style={td}>{formatSessionDate(session.date)}</td>
+                  <td style={td}>{session.startTime || "TBD"}</td>
+                  <td style={td}>{session.endTime || "TBD"}</td>
+                  <td style={td}>{session.room || session.roomRaw || "TBD"}</td>
+                  <td style={td}>{session.lead || "—"}</td>
+                  <td style={td}>
+                    {(session.employees || []).length ? (session.employees || []).join(", ") : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 }
+
+const linkBtn: React.CSSProperties = {
+  textDecoration: "none",
+  background: "#ffffff",
+  color: "#163a70",
+  border: "1px solid #d9e2ef",
+  borderRadius: 12,
+  padding: "12px 16px",
+  fontWeight: 800,
+};
+
+const primaryBtn: React.CSSProperties = {
+  textDecoration: "none",
+  background: "#1E5AA8",
+  color: "#fff",
+  borderRadius: 12,
+  padding: "12px 16px",
+  fontWeight: 800,
+};
+
+const secondaryBtn: React.CSSProperties = {
+  textDecoration: "none",
+  background: "#2E8B57",
+  color: "#fff",
+  borderRadius: 12,
+  padding: "12px 16px",
+  fontWeight: 800,
+};
+
+const td: React.CSSProperties = {
+  padding: "12px 10px",
+  borderBottom: "1px solid #eef2f7",
+  fontSize: 14,
+  color: "#163a70",
+  verticalAlign: "top",
+};
