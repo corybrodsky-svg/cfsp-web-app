@@ -89,6 +89,12 @@ export default function DashboardPage() {
         <Link href="/admin" style={actionLinkStyle}>
           Open Admin Hub
         </Link>
+        <Link href="/upload-schedule" style={styles.card}>
+  <h2 style={styles.cardTitle}>Upload Schedule</h2>
+  <p style={styles.cardText}>
+    Import a full Excel schedule and auto-generate events plus Sim Op assignments.
+  </p>
+</Link>
       </div>
 
       <div style={statGrid}>
