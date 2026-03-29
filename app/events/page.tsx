@@ -166,7 +166,25 @@ export default function EventsPage() {
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   }
+function getDisplayDates(event: EventItem) {
+  const validISO = Array.from(
+    new Set(
+      (event.sessions || [])
+        .map((session) => String(session.date || ""))
+        .filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date))
+    )
+  ).sort();
 
+  const pretty = validISO
+    .map((iso) => {
+      const dt = new Date(`${iso}T00:00:00`);
+      if (Number.isNaN(dt.getTime())) return "";
+      return `${dt.getMonth() + 1}/${dt.getDate()}/${String(dt.getFullYear()).slice(-2)}`;
+    })
+    .filter(Boolean);
+
+  return pretty.length ? pretty.join(", ") : "Date TBD";
+}
   function handleDelete(id: string) {
     const target = events.find((e) => e.id === id);
     const next = events.filter((e) => e.id !== id);
@@ -199,7 +217,7 @@ export default function EventsPage() {
     return (
       event.name.toLowerCase().includes(q) ||
       event.status.toLowerCase().includes(q) ||
-      String(event.date_text || "").toLowerCase().includes(q) ||
+      getDisplayDates(event).toLowerCase().includes(q) ||
       simOps.includes(q) ||
       rooms.includes(q) ||
       leads.includes(q)
@@ -322,7 +340,7 @@ export default function EventsPage() {
                   <div style={styles.infoGrid}>
                     <div style={styles.infoCell}>
                       <div style={styles.infoLabel}>Dates</div>
-                      <div style={styles.infoValue}>{event.date_text || "TBD"}</div>
+                      <div style={styles.infoValue}>{getDisplayDates(event)}</div>
                     </div>
 
                     <div style={styles.infoCell}>
