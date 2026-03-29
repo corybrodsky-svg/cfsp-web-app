@@ -1,6 +1,7 @@
 import Link from "next/link";
 import SiteShell from "../components/SiteShell";
 import { events, sps } from "../lib/mockData";
+import { clearSession, DemoUser, getSession } from "../lib/demoAuth";
 
 const statGrid: React.CSSProperties = {
   display: "grid",
