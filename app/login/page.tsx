@@ -1,5 +1,3 @@
-"use client";
-
 import Link from "next/link";
 
 export default function LoginPage() {
@@ -31,7 +29,7 @@ export default function LoginPage() {
         </h1>
 
         <p style={{ marginBottom: "20px", color: "#516173" }}>
-          Temporary direct access while login is disabled.
+          Temporary direct access while login is being rebuilt.
         </p>
 
         <Link
