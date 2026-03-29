@@ -43,6 +43,17 @@ export type SimOpItem = {
   role: "sim_op";
 };
 
+export type AppUser = {
+  id: string;
+  fullName: string;
+  username: string;
+  email?: string;
+  password: string;
+  role: UserRole;
+  pool?: PoolType;
+  aliases?: string[];
+};
+
 export type AssignmentDraft = {
   id: string;
   spId: string;
@@ -57,6 +68,8 @@ export type AssignmentDraft = {
 
 export const DEFAULT_PASSWORD = "Drexel1$";
 export const ASSIGNMENT_STORAGE_KEY = "cfsp_assignment_drafts";
+export const EVENT_OVERRIDES_STORAGE_KEY = "cfsp_event_overrides";
+export const AUTH_STORAGE_KEY = "cfsp_current_user";
 
 export function slugify(value: string) {
   return value
@@ -79,102 +92,18 @@ export function normalizePersonName(value: string) {
 }
 
 export const simOps: SimOpItem[] = [
-  {
-    id: "quentin",
-    fullName: "Quentin",
-    aliases: ["quentin", "q"],
-    username: "q",
-    defaultPassword: DEFAULT_PASSWORD,
-    role: "sim_op",
-  },
-  {
-    id: "cory",
-    fullName: "Cory",
-    aliases: ["cory", "cbrodsky", "brodsky"],
-    username: "cbrodsky",
-    defaultPassword: DEFAULT_PASSWORD,
-    role: "sim_op",
-  },
-  {
-    id: "kate",
-    fullName: "Kate",
-    aliases: ["kate"],
-    username: "kate",
-    defaultPassword: DEFAULT_PASSWORD,
-    role: "sim_op",
-  },
-  {
-    id: "kat",
-    fullName: "Kat",
-    aliases: ["kat"],
-    username: "kat",
-    defaultPassword: DEFAULT_PASSWORD,
-    role: "sim_op",
-  },
-  {
-    id: "jamiel",
-    fullName: "Jamiel",
-    aliases: ["jamiel"],
-    username: "jamiel",
-    defaultPassword: DEFAULT_PASSWORD,
-    role: "sim_op",
-  },
-  {
-    id: "jp",
-    fullName: "JP",
-    aliases: ["jp"],
-    username: "jp",
-    defaultPassword: DEFAULT_PASSWORD,
-    role: "sim_op",
-  },
-  {
-    id: "patrick",
-    fullName: "Patrick",
-    aliases: ["patrick", "pat"],
-    username: "ppatrick",
-    defaultPassword: DEFAULT_PASSWORD,
-    role: "sim_op",
-  },
-  {
-    id: "cristina",
-    fullName: "Cristina",
-    aliases: ["cristina"],
-    username: "ccristina",
-    defaultPassword: DEFAULT_PASSWORD,
-    role: "sim_op",
-  },
-  {
-    id: "kevin",
-    fullName: "Kevin",
-    aliases: ["kevin"],
-    username: "kkevin",
-    defaultPassword: DEFAULT_PASSWORD,
-    role: "sim_op",
-  },
-  {
-    id: "kris",
-    fullName: "Kris",
-    aliases: ["kris"],
-    username: "kkris",
-    defaultPassword: DEFAULT_PASSWORD,
-    role: "sim_op",
-  },
-  {
-    id: "helen",
-    fullName: "Helen",
-    aliases: ["helen"],
-    username: "hhelen",
-    defaultPassword: DEFAULT_PASSWORD,
-    role: "sim_op",
-  },
-  {
-    id: "diane",
-    fullName: "Diane",
-    aliases: ["diane"],
-    username: "ddiane",
-    defaultPassword: DEFAULT_PASSWORD,
-    role: "sim_op",
-  },
+  { id: "quentin", fullName: "Quentin", aliases: ["quentin", "q"], username: "q", defaultPassword: DEFAULT_PASSWORD, role: "sim_op" },
+  { id: "cory", fullName: "Cory", aliases: ["cory", "cbrodsky", "brodsky"], username: "cbrodsky", defaultPassword: DEFAULT_PASSWORD, role: "sim_op" },
+  { id: "kate", fullName: "Kate", aliases: ["kate"], username: "kate", defaultPassword: DEFAULT_PASSWORD, role: "sim_op" },
+  { id: "kat", fullName: "Kat", aliases: ["kat"], username: "kat", defaultPassword: DEFAULT_PASSWORD, role: "sim_op" },
+  { id: "jamiel", fullName: "Jamiel", aliases: ["jamiel"], username: "jamiel", defaultPassword: DEFAULT_PASSWORD, role: "sim_op" },
+  { id: "jp", fullName: "JP", aliases: ["jp"], username: "jp", defaultPassword: DEFAULT_PASSWORD, role: "sim_op" },
+  { id: "patrick", fullName: "Patrick", aliases: ["patrick", "pat"], username: "ppatrick", defaultPassword: DEFAULT_PASSWORD, role: "sim_op" },
+  { id: "cristina", fullName: "Cristina", aliases: ["cristina"], username: "ccristina", defaultPassword: DEFAULT_PASSWORD, role: "sim_op" },
+  { id: "kevin", fullName: "Kevin", aliases: ["kevin"], username: "kkevin", defaultPassword: DEFAULT_PASSWORD, role: "sim_op" },
+  { id: "kris", fullName: "Kris", aliases: ["kris"], username: "kkris", defaultPassword: DEFAULT_PASSWORD, role: "sim_op" },
+  { id: "helen", fullName: "Helen", aliases: ["helen"], username: "hhelen", defaultPassword: DEFAULT_PASSWORD, role: "sim_op" },
+  { id: "diane", fullName: "Diane", aliases: ["diane"], username: "ddiane", defaultPassword: DEFAULT_PASSWORD, role: "sim_op" },
 ];
 
 export function resolveSimOpName(value: string) {
@@ -277,6 +206,52 @@ export const sps: SPItem[] = [
   },
 ];
 
+export const seededUsers: AppUser[] = [
+  {
+    id: "simop-cory",
+    fullName: "Cory Brodsky",
+    username: "cwb55@drexel.edu",
+    email: "cwb55@drexel.edu",
+    password: DEFAULT_PASSWORD,
+    role: "sim_op",
+    aliases: ["cory", "cbrodsky", "brodsky", "cwb55"],
+  },
+  {
+    id: "sp-cory",
+    fullName: "Cory Brodsky",
+    username: "cory.brodsky@gmail.com",
+    email: "cory.brodsky@gmail.com",
+    password: DEFAULT_PASSWORD,
+    role: "sp",
+    pool: "Both",
+    aliases: ["cbrodskysp"],
+  },
+
+  ...simOps
+    .filter((simOp) => simOp.username !== "cbrodsky")
+    .map((simOp) => ({
+      id: simOp.id,
+      fullName: simOp.fullName,
+      username: simOp.username,
+      email: undefined,
+      password: simOp.defaultPassword,
+      role: "sim_op" as const,
+      aliases: simOp.aliases,
+    })),
+
+  ...sps
+    .filter((sp) => sp.username !== "cbrodsky")
+    .map((sp) => ({
+      id: sp.id,
+      fullName: sp.fullName,
+      username: sp.username,
+      email: sp.email,
+      password: sp.defaultPassword,
+      role: "sp" as const,
+      pool: sp.pool,
+    })),
+];
+
 export function getStoredAssignments(): AssignmentDraft[] {
   if (typeof window === "undefined") return [];
   try {
@@ -291,10 +266,7 @@ export function getStoredAssignments(): AssignmentDraft[] {
 
 export function saveStoredAssignments(assignments: AssignmentDraft[]) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(
-    ASSIGNMENT_STORAGE_KEY,
-    JSON.stringify(assignments)
-  );
+  window.localStorage.setItem(ASSIGNMENT_STORAGE_KEY, JSON.stringify(assignments));
 }
 
 export function addOrReplaceAssignment(draft: AssignmentDraft) {
@@ -304,14 +276,12 @@ export function addOrReplaceAssignment(draft: AssignmentDraft) {
     if (draft.eventMode === "existing" && item.eventMode === "existing") {
       return !(item.spId === draft.spId && item.eventId === draft.eventId);
     }
-
     if (draft.eventMode === "placeholder" && item.eventMode === "placeholder") {
       return !(
         item.spId === draft.spId &&
         item.eventName.trim().toLowerCase() === draft.eventName.trim().toLowerCase()
       );
     }
-
     return true;
   });
 
