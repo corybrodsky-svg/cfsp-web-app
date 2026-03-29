@@ -10,7 +10,7 @@ import {
   ImportedSession,
   mergeImportedEvents,
   parseScheduleRows,
-import { ... } from "../lib/scheduleImport";;
+} from "../lib/schedule-Import";
 
 export default function UploadSchedulePage() {
   const [fileName, setFileName] = useState("");
