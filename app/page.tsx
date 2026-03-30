@@ -1,94 +1,149 @@
-"use client";
-
 import Link from "next/link";
+import type { CSSProperties } from "react";
+import SiteShell from "./components/SiteShell";
 
-export default function DashboardPage() {
+const gridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+  gap: "18px",
+};
+
+const cardStyle: CSSProperties = {
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid rgba(23,61,112,0.10)",
+  borderRadius: "24px",
+  padding: "22px",
+  textDecoration: "none",
+  color: "#173d70",
+  boxShadow: "0 14px 30px rgba(23,61,112,0.08)",
+  display: "flex",
+  flexDirection: "column",
+  gap: "10px",
+  minHeight: "170px",
+};
+
+const titleStyle: CSSProperties = {
+  fontSize: "28px",
+  fontWeight: 800,
+};
+
+const subtitleStyle: CSSProperties = {
+  color: "#54708c",
+  lineHeight: 1.6,
+  fontSize: "15px",
+};
+
+const cardTitleStyle: CSSProperties = {
+  fontSize: "24px",
+  fontWeight: 800,
+};
+
+const cardTextStyle: CSSProperties = {
+  fontSize: "15px",
+  lineHeight: 1.6,
+  color: "#5b7593",
+};
+
+const badgeStyle: CSSProperties = {
+  display: "inline-block",
+  width: "fit-content",
+  padding: "6px 10px",
+  borderRadius: "999px",
+  background: "rgba(23,61,112,0.08)",
+  color: "#173d70",
+  fontSize: "12px",
+  fontWeight: 800,
+  letterSpacing: "0.04em",
+  textTransform: "uppercase",
+};
+
+const cards = [
+  {
+    href: "/login",
+    title: "Login",
+    text: "Sign in as SP, Sim Op, or Admin and move into the right part of the app.",
+    badge: "Access",
+  },
+  {
+    href: "/dashboard",
+    title: "Dashboard",
+    text: "See event priorities, staffing shortages, next actions, and quick system access.",
+    badge: "Control",
+  },
+  {
+    href: "/intake",
+    title: "Session Intake",
+    text: "Create an event using the same operational thinking you built in Excel.",
+    badge: "Core Tool",
+  },
+  {
+    href: "/events",
+    title: "Events",
+    text: "Review active events, statuses, dates, staffing needs, and detail pages.",
+    badge: "Operations",
+  },
+  {
+    href: "/sp-directory",
+    title: "SP Directory",
+    text: "Browse standardized patients, track pool affiliation, and prep assignments.",
+    badge: "Roster",
+  },
+  {
+    href: "/blueprints",
+    title: "Blueprint Builder",
+    text: "Turn event structure into reusable simulation designs and segment layouts.",
+    badge: "Planning",
+  },
+  {
+    href: "/sim-flow",
+    title: "Sim Flow Calculator",
+    text: "Calculate rounds, timing, transitions, room usage, and staffing pressure.",
+    badge: "Engine",
+  },
+  {
+    href: "/emails",
+    title: "Email Builder",
+    text: "Generate training, prep, assignment, and logistics drafts from event data.",
+    badge: "Automation",
+  },
+  {
+    href: "/upload",
+    title: "Upload Schedule",
+    text: "Import schedules and session materials so CFSP can turn them into operations-ready events.",
+    badge: "Import",
+  },
+  {
+    href: "/me",
+    title: "My Profile",
+    text: "View your role, profile, assignments, and future self-service account actions.",
+    badge: "Account",
+  },
+];
+
+export default function HomePage() {
   return (
-    <div style={{ display: "grid", gap: 24 }}>
-      <section
-        style={{
-          background: "#ffffff",
-          border: "1px solid #d4deeb",
-          borderRadius: 24,
-          padding: 28,
-          boxShadow: "0 12px 28px rgba(18,55,107,0.07)",
-        }}
-      >
-        <div style={{ fontSize: 40, fontWeight: 900, color: "#12376b" }}>
-          Dashboard
-        </div>
-        <div style={{ fontSize: 17, color: "#61748e", marginTop: 10 }}>
-          This is the dashboard page. If you click Events, this page should disappear and you
-          should see the Events header instead.
-        </div>
-
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 20 }}>
-          <Link href="/events" style={blueBtn}>
-            Go to Events
-          </Link>
-          <Link href="/upload-schedule" style={greenBtn}>
-            Upload Schedule
-          </Link>
-        </div>
-      </section>
-
-      <section
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: 18,
-        }}
-      >
-        <StatCard label="Total Events" value="3" accent="#1E5AA8" />
-        <StatCard label="SPs Assigned" value="17" accent="#2E8B57" />
-        <StatCard label="Need SPs" value="2" accent="#c84a3a" />
-      </section>
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: string;
-  accent: string;
-}) {
-  return (
-    <div
-      style={{
-        background: "#ffffff",
-        border: "1px solid #d4deeb",
-        borderLeft: `8px solid ${accent}`,
-        borderRadius: 20,
-        padding: 22,
-        boxShadow: "0 12px 28px rgba(18,55,107,0.07)",
-      }}
+    <SiteShell
+      title="Clean control of scheduling, staffing, assignments, automation, and sim design."
+      subtitle="This is the working CFSP launch hub. Every card below is a real route so the app behaves like a real platform now, not a dead mockup."
     >
-      <div style={{ fontSize: 14, fontWeight: 800, color: "#61748e" }}>{label}</div>
-      <div style={{ fontSize: 42, fontWeight: 900, color: "#12376b", marginTop: 10 }}>
-        {value}
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        <div style={badgeStyle}>CFSP Launch Pad</div>
+        <div style={titleStyle}>Build from here. Run from here.</div>
+        <div style={subtitleStyle}>
+          Intake feeds blueprints. Blueprints feed sim flow. Sim flow feeds staffing and
+          email automation. That backbone starts now.
+        </div>
       </div>
-    </div>
+
+      <div style={gridStyle}>
+        {cards.map((card) => (
+          <Link key={card.href} href={card.href} style={cardStyle}>
+            <div style={badgeStyle}>{card.badge}</div>
+            <div style={cardTitleStyle}>{card.title}</div>
+            <div style={cardTextStyle}>{card.text}</div>
+          </Link>
+        ))}
+      </div>
+    </SiteShell>
   );
 }
-
-const blueBtn: React.CSSProperties = {
-  textDecoration: "none",
-  background: "#1E5AA8",
-  color: "#ffffff",
-  padding: "12px 18px",
-  borderRadius: 14,
-  fontWeight: 900,
-};
-
-const greenBtn: React.CSSProperties = {
-  textDecoration: "none",
-  background: "#2E8B57",
-  color: "#ffffff",
-  padding: "12px 18px",
-  borderRadius: 14,
-  fontWeight: 900,
-};

@@ -9,29 +9,30 @@ const cardStyle: CSSProperties = {
   boxShadow: "0 14px 30px rgba(23,61,112,0.08)",
 };
 
-export default function MyProfilePage() {
+export default function UploadPage() {
   return (
     <SiteShell
-      title="My Profile"
-      subtitle="Profile, role, assignments, and future self-service account actions."
+      title="Upload"
+      subtitle="Bring in schedules and session documents so they can become structured CFSP event data."
     >
       <div style={cardStyle}>
         <div style={{ fontSize: "24px", fontWeight: 800, color: "#173d70", marginBottom: "12px" }}>
-          User profile
+          Schedule and document intake
         </div>
         <div style={{ color: "#597391", lineHeight: 1.8 }}>
-          This page will support:
+          This page is where you’ll connect:
           <br />
           <br />
-          • SP profile details
+          • Excel schedule imports
           <br />
-          • Sim Op-specific views
+          • session details Word documents
           <br />
-          • role-sensitive assignments
+          • future parser logic for event creation
           <br />
-          • future photo and profile editing
+          • assignment imports and staffing cleanup
           <br />
-          • self-service account updates
+          <br />
+          For now, it is a real route and stable placeholder ready for file upload wiring.
         </div>
       </div>
     </SiteShell>

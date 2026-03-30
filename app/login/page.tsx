@@ -1,215 +1,163 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { getSession, loginUser } from "../lib/demoAuth";
+import { useState } from "react";
+import type { CSSProperties } from "react";
+import SiteShell from "../components/SiteShell";
+
+const gridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1.1fr 0.9fr",
+  gap: "18px",
+};
+
+const cardStyle: CSSProperties = {
+  background: "rgba(255,255,255,0.94)",
+  borderRadius: "24px",
+  border: "1px solid rgba(23,61,112,0.10)",
+  padding: "24px",
+  boxShadow: "0 14px 30px rgba(23,61,112,0.08)",
+};
+
+const inputStyle: CSSProperties = {
+  width: "100%",
+  padding: "14px 16px",
+  borderRadius: "14px",
+  border: "1px solid rgba(23,61,112,0.16)",
+  fontSize: "15px",
+  outline: "none",
+};
+
+const labelStyle: CSSProperties = {
+  fontWeight: 700,
+  color: "#173d70",
+  marginBottom: "8px",
+};
+
+const buttonRowStyle: CSSProperties = {
+  display: "flex",
+  gap: "12px",
+  flexWrap: "wrap",
+  marginTop: "10px",
+};
+
+const primaryButtonStyle: CSSProperties = {
+  border: "none",
+  borderRadius: "14px",
+  padding: "14px 18px",
+  background: "linear-gradient(135deg, #173d70 0%, #1d8a6a 100%)",
+  color: "#ffffff",
+  fontWeight: 800,
+  cursor: "pointer",
+};
+
+const secondaryButtonStyle: CSSProperties = {
+  border: "1px solid rgba(23,61,112,0.12)",
+  borderRadius: "14px",
+  padding: "14px 18px",
+  background: "#ffffff",
+  color: "#173d70",
+  fontWeight: 800,
+  cursor: "pointer",
+};
+
+const pillStyle: CSSProperties = {
+  display: "inline-block",
+  padding: "8px 12px",
+  borderRadius: "999px",
+  background: "rgba(23,61,112,0.08)",
+  color: "#173d70",
+  fontSize: "12px",
+  fontWeight: 800,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
 export default function LoginPage() {
-  const router = useRouter();
-
-  const [login, setLogin] = useState("");
-  const [password, setPassword] = useState("Drexel1$");
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    const existing = getSession();
-    if (!existing) return;
-
-    if (existing.role === "sp") router.replace("/profile");
-    else router.replace("/dashboard");
-  }, [router]);
-
-  function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setMessage("");
-
-    const result = loginUser(login, password);
-
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-
-    setMessage(`Welcome back, ${result.user.firstName}.`);
-
-    window.setTimeout(() => {
-      if (result.user.role === "sp") router.push("/profile");
-      else router.push("/dashboard");
-    }, 600);
-  }
+  const [role, setRole] = useState("Admin");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
 
   return (
-    <div style={styles.page}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>CFSP Login</h1>
-        <p style={styles.subtitle}>
-          Sign in with your email or username.
-        </p>
+    <SiteShell
+      title="Login"
+      subtitle="Use this as the stable entry point for Admin, Sim Op, and SP access while auth wiring continues."
+    >
+      <div style={gridStyle}>
+        <div style={cardStyle}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <div style={pillStyle}>Access Control</div>
+            <div style={{ fontSize: "28px", fontWeight: 800, color: "#173d70" }}>
+              Welcome back to CFSP
+            </div>
+            <div style={{ color: "#597391", lineHeight: 1.6 }}>
+              This page is now a true route and real UI layer. You can wire Supabase auth into
+              this next, but the app routing and page structure no longer depends on a broken
+              fake landing page.
+            </div>
 
-        <div style={styles.demoBox}>
-          <div style={styles.demoTitle}>Built-in test accounts</div>
-          <div style={styles.demoLine}>Admin: <strong>admin@cfsp.local</strong> / <strong>Drexel1$</strong></div>
-          <div style={styles.demoLine}>Sim Op: <strong>simop@cfsp.local</strong> / <strong>Drexel1$</strong></div>
-          <div style={styles.demoLine}>SP: <strong>sp@cfsp.local</strong> / <strong>Drexel1$</strong></div>
+            <div>
+              <div style={labelStyle}>Role</div>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                style={inputStyle}
+              >
+                <option>Admin</option>
+                <option>Sim Op</option>
+                <option>SP</option>
+              </select>
+            </div>
+
+            <div>
+              <div style={labelStyle}>Username / Email</div>
+              <input
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter username or email"
+                style={inputStyle}
+              />
+            </div>
+
+            <div>
+              <div style={labelStyle}>Password</div>
+              <input
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type="password"
+                placeholder="Enter password"
+                style={inputStyle}
+              />
+            </div>
+
+            <div style={buttonRowStyle}>
+              <button style={primaryButtonStyle} type="button">
+                Sign In
+              </button>
+              <button style={secondaryButtonStyle} type="button">
+                Use Test Login
+              </button>
+            </div>
+          </div>
         </div>
 
-        {message ? <div style={styles.success}>{message}</div> : null}
-        {error ? <div style={styles.error}>{error}</div> : null}
-
-        <form onSubmit={handleLogin} style={styles.form}>
-          <div style={styles.field}>
-            <label style={styles.label}>Email or Username</label>
-            <input
-              style={styles.input}
-              value={login}
-              onChange={(e) => setLogin(e.target.value)}
-              placeholder="admin@cfsp.local or cbrodsky"
-            />
+        <div style={cardStyle}>
+          <div style={{ fontSize: "22px", fontWeight: 800, color: "#173d70", marginBottom: "12px" }}>
+            Role behavior
           </div>
-
-          <div style={styles.field}>
-            <label style={styles.label}>Password</label>
-            <input
-              style={styles.input}
-              type="text"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Drexel1$"
-            />
+          <div style={{ color: "#597391", lineHeight: 1.7 }}>
+            <strong>Admin:</strong> full visibility across intake, events, assignments, SP directory,
+            blueprints, emails, and future reporting.
+            <br />
+            <br />
+            <strong>Sim Op:</strong> sees assigned and relevant event operations, staffing, timing,
+            and prep tools.
+            <br />
+            <br />
+            <strong>SP:</strong> sees profile, assignments, event prep, and future self-service
+            updates.
           </div>
-
-          <div style={styles.actions}>
-            <button type="submit" style={styles.primaryButton}>
-              Log In
-            </button>
-
-            <Link href="/create-account" style={styles.secondaryLink}>
-              Create Account
-            </Link>
-          </div>
-        </form>
+        </div>
       </div>
-    </div>
+    </SiteShell>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#f4f7fb",
-    padding: "24px",
-  },
-  card: {
-    width: "100%",
-    maxWidth: "560px",
-    background: "#ffffff",
-    border: "1px solid #d8e0ec",
-    borderRadius: "20px",
-    padding: "28px",
-    boxShadow: "0 10px 30px rgba(19, 40, 72, 0.08)",
-  },
-  title: {
-    margin: 0,
-    fontSize: "32px",
-    fontWeight: 800,
-    color: "#183153",
-  },
-  subtitle: {
-    margin: "10px 0 18px 0",
-    color: "#5f7183",
-    fontSize: "15px",
-  },
-  demoBox: {
-    marginBottom: "18px",
-    border: "1px solid #d8e0ec",
-    borderRadius: "14px",
-    padding: "14px",
-    background: "#f8fbff",
-  },
-  demoTitle: {
-    fontSize: "13px",
-    fontWeight: 800,
-    color: "#183153",
-    marginBottom: "8px",
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-  },
-  demoLine: {
-    fontSize: "14px",
-    color: "#334155",
-    marginBottom: "6px",
-  },
-  success: {
-    marginBottom: "16px",
-    padding: "12px 14px",
-    borderRadius: "12px",
-    background: "#dcfce7",
-    color: "#166534",
-    fontWeight: 700,
-    border: "1px solid #bbf7d0",
-  },
-  error: {
-    marginBottom: "16px",
-    padding: "12px 14px",
-    borderRadius: "12px",
-    background: "#fee2e2",
-    color: "#991b1b",
-    fontWeight: 700,
-    border: "1px solid #fecaca",
-  },
-  form: {
-    display: "grid",
-    gap: "16px",
-  },
-  field: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-  },
-  label: {
-    fontSize: "14px",
-    fontWeight: 700,
-    color: "#334155",
-  },
-  input: {
-    height: "46px",
-    borderRadius: "10px",
-    border: "1px solid #cfd8e3",
-    padding: "0 12px",
-    fontSize: "14px",
-    background: "#fff",
-  },
-  actions: {
-    display: "flex",
-    gap: "12px",
-    flexWrap: "wrap",
-    alignItems: "center",
-    marginTop: "6px",
-  },
-  primaryButton: {
-    background: "#1d4ed8",
-    color: "#fff",
-    border: "none",
-    borderRadius: "10px",
-    padding: "12px 16px",
-    fontWeight: 800,
-    cursor: "pointer",
-  },
-  secondaryLink: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "12px 16px",
-    borderRadius: "10px",
-    textDecoration: "none",
-    background: "#fff",
-    color: "#183153",
-    border: "1px solid #d8e0ec",
-    fontWeight: 700,
-  },
-};
