@@ -4,13 +4,15 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
-type ImportedSession = {
+const STORAGE_KEY = "cfsp_events_v1";
+
+type SessionItem = {
   id?: string;
   date?: string;
-  room?: string;
-  roomRaw?: string;
   startTime?: string;
   endTime?: string;
+  room?: string;
+  roomRaw?: string;
   employees?: string[];
   lead?: string;
 };
@@ -18,40 +20,209 @@ type ImportedSession = {
 type EventItem = {
   id: string;
   name: string;
-  status: string;
-  date_text: string;
-  sp_needed: number;
-  sp_assigned: number;
-  updated_at: string;
+  status?: string;
+  sp_needed?: number;
+  sp_assigned?: number;
+  updated_at?: string;
   assignedSimOps?: string[];
   leadSimOps?: string[];
-  sessions?: ImportedSession[];
+  sessions?: SessionItem[];
+  notes?: string;
 };
 
-const STORAGE_KEY = "cfsp_events_v1";
-const navy = "#163a70";
-const blue = "#1E5AA8";
-const green = "#2E8B57";
-const border = "#d9e2ef";
-const slate = "#5f6f86";
-const white = "#ffffff";
+export default function EventDetailPage() {
+  const params = useParams<{ id: string }>();
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
-function loadEvents(): EventItem[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setEvents(parsed);
+      }
+    } catch {}
+    setLoaded(true);
+  }, []);
+
+  const event = useMemo(() => {
+    return events.find((item) => item.id === params.id);
+  }, [events, params.id]);
+
+  if (!loaded) {
+    return (
+      <div style={shell}>
+        <div style={card}>
+          <div style={title}>Loading event...</div>
+        </div>
+      </div>
+    );
   }
+
+  if (!event) {
+    return (
+      <div style={shell}>
+        <div style={card}>
+          <div style={title}>Event Not Found</div>
+          <div style={subtle}>
+            This event id does not match what is currently saved in local storage.
+          </div>
+
+          <div style={buttonRow}>
+            <Link href="/events" style={blueBtn}>
+              Back to Events
+            </Link>
+            <Link href="/dashboard" style={whiteBtn}>
+              Dashboard
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const sessions = event.sessions || [];
+  const leads =
+    event.leadSimOps && event.leadSimOps.length
+      ? event.leadSimOps
+      : uniqueStrings(sessions.map((s) => s.lead || "").filter(Boolean));
+
+  const simOps =
+    event.assignedSimOps && event.assignedSimOps.length
+      ? event.assignedSimOps
+      : uniqueStrings(sessions.flatMap((s) => s.employees || []));
+
+  const rooms = uniqueStrings(
+    sessions.map((s) => s.room || s.roomRaw || "").filter(Boolean)
+  );
+
+  const displayDates = getDisplayDates(sessions);
+
+  return (
+    <div style={shell}>
+      <div style={heroCard}>
+        <div>
+          <div style={heroTitle}>{event.name}</div>
+          <div style={subtle}>
+            {event.updated_at
+              ? `Last updated: ${new Date(event.updated_at).toLocaleString()}`
+              : "Imported event"}
+          </div>
+        </div>
+
+        <div style={pill}>{event.status || "Draft"}</div>
+      </div>
+
+      <div style={statsGrid}>
+        <Stat label="Dates" value={displayDates} />
+        <Stat label="Sessions" value={String(sessions.length)} />
+        <Stat label="Rooms" value={String(rooms.length)} />
+        <Stat
+          label="SP Coverage"
+          value={`${event.sp_assigned || 0}/${event.sp_needed || 0}`}
+        />
+      </div>
+
+      <div style={card}>
+        <div style={sectionTitle}>Event Summary</div>
+
+        <div style={infoGrid}>
+          <InfoRow label="Assigned Sim Ops" value={simOps.join(", ") || "None shown"} />
+          <InfoRow label="Lead(s)" value={leads.join(", ") || "None shown"} />
+          <InfoRow label="Rooms" value={rooms.join(", ") || "None shown"} />
+          <InfoRow label="Notes" value={event.notes || "No notes"} />
+        </div>
+
+        <div style={buttonRow}>
+          <Link href="/events" style={blueBtn}>
+            Back to Events
+          </Link>
+          <Link href="/upload-schedule" style={greenBtn}>
+            Upload Schedule
+          </Link>
+        </div>
+      </div>
+
+      <div style={card}>
+        <div style={sectionTitle}>Session Schedule</div>
+
+        {sessions.length === 0 ? (
+          <div style={subtle}>No sessions attached to this event yet.</div>
+        ) : (
+          <div style={tableWrap}>
+            <table style={table}>
+              <thead>
+                <tr>
+                  <th style={th}>Date</th>
+                  <th style={th}>Start</th>
+                  <th style={th}>End</th>
+                  <th style={th}>Room</th>
+                  <th style={th}>Lead</th>
+                  <th style={th}>Assigned</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sessions.map((session, index) => (
+                  <tr key={session.id || `${event.id}-${index}`}>
+                    <td style={td}>{formatDateSafe(session.date)}</td>
+                    <td style={td}>{session.startTime || "—"}</td>
+                    <td style={td}>{session.endTime || "—"}</td>
+                    <td style={td}>{session.room || session.roomRaw || "—"}</td>
+                    <td style={td}>{session.lead || "—"}</td>
+                    <td style={td}>
+                      {(session.employees || []).length
+                        ? session.employees!.join(", ")
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
-function getDisplayDates(event: EventItem) {
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={statCard}>
+      <div style={statLabel}>{label}</div>
+      <div style={statValue}>{value}</div>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={infoRow}>
+      <div style={infoLabel}>{label}</div>
+      <div style={infoValue}>{value}</div>
+    </div>
+  );
+}
+
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values.map((v) => v.trim()).filter(Boolean)));
+}
+
+function formatDateSafe(value?: string) {
+  if (!value) return "TBD";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const dt = new Date(`${value}T00:00:00`);
+    if (!Number.isNaN(dt.getTime())) {
+      return `${dt.getMonth() + 1}/${dt.getDate()}/${String(dt.getFullYear()).slice(-2)}`;
+    }
+  }
+  return "TBD";
+}
+
+function getDisplayDates(sessions: SessionItem[]) {
   const validISO = Array.from(
     new Set(
-      (event.sessions || [])
+      sessions
         .map((session) => String(session.date || ""))
         .filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date))
     )
@@ -68,230 +239,181 @@ function getDisplayDates(event: EventItem) {
   return pretty.length ? pretty.join(", ") : "Date TBD";
 }
 
-function formatSessionDate(value?: string) {
-  if (!value) return "TBD";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const dt = new Date(`${value}T00:00:00`);
-    if (!Number.isNaN(dt.getTime())) {
-      return `${dt.getMonth() + 1}/${dt.getDate()}/${String(dt.getFullYear()).slice(-2)}`;
-    }
-  }
-  return "TBD";
-}
-
-export default function EventDetailPage() {
-  const params = useParams<{ id: string }>();
-  const [events, setEvents] = useState<EventItem[]>([]);
-
-  useEffect(() => {
-    setEvents(loadEvents());
-  }, []);
-
-  const event = useMemo(
-    () => events.find((item) => item.id === params.id),
-    [events, params.id]
-  );
-
-  if (!event) {
-    return (
-      <div
-        style={{
-          background: white,
-          border: `1px solid ${border}`,
-          borderRadius: 24,
-          padding: 24,
-          display: "grid",
-          gap: 16,
-        }}
-      >
-        <div style={{ fontSize: 34, fontWeight: 900, color: navy }}>Event Not Found</div>
-        <div style={{ fontSize: 15, color: slate }}>
-          This event id does not match the current dataset.
-        </div>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <Link href="/events" style={linkBtn}>
-            Back to Events
-          </Link>
-          <Link href="/dashboard" style={linkBtn}>
-            Back to Dashboard
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  const simOps = event.assignedSimOps || [];
-  const leads = event.leadSimOps || [];
-  const sessions = event.sessions || [];
-
-  return (
-    <div style={{ display: "grid", gap: 20 }}>
-      <section
-        style={{
-          background: white,
-          border: `1px solid ${border}`,
-          borderRadius: 24,
-          padding: 24,
-          display: "grid",
-          gap: 14,
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-          <div>
-            <div style={{ fontSize: 34, fontWeight: 900, color: navy }}>{event.name}</div>
-            <div style={{ fontSize: 14, color: slate, marginTop: 8 }}>
-              Last updated: {new Date(event.updated_at).toLocaleString()}
-            </div>
-          </div>
-
-          <div
-            style={{
-              borderRadius: 999,
-              padding: "10px 14px",
-              border: `1px solid ${border}`,
-              background: "#edf4ff",
-              color: blue,
-              fontWeight: 800,
-              height: "fit-content",
-            }}
-          >
-            {event.status}
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: 14,
-          }}
-        >
-          {[
-            { label: "Dates", value: getDisplayDates(event) },
-            { label: "Sessions", value: sessions.length },
-            { label: "Rooms", value: new Set(sessions.map((s) => s.room || s.roomRaw || "")).size },
-            { label: "SP Coverage", value: `${event.sp_assigned} / ${event.sp_needed}` },
-          ].map((item) => (
-            <div
-              key={item.label}
-              style={{
-                background: "#f8fbff",
-                border: `1px solid #e4edf7`,
-                borderRadius: 16,
-                padding: 16,
-              }}
-            >
-              <div style={{ fontSize: 12, fontWeight: 800, color: slate }}>{item.label}</div>
-              <div style={{ fontSize: 20, fontWeight: 900, color: navy, marginTop: 8 }}>
-                {item.value}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ display: "grid", gap: 8, fontSize: 15, color: navy }}>
-          <div><strong>Assigned Sim Ops:</strong> {simOps.length ? simOps.join(", ") : "None shown"}</div>
-          <div><strong>Lead(s):</strong> {leads.length ? leads.join(", ") : "None shown"}</div>
-        </div>
-
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <Link href="/events" style={primaryBtn}>Back to Events</Link>
-          <Link href="/upload-schedule" style={secondaryBtn}>Upload Schedule</Link>
-        </div>
-      </section>
-
-      <section
-        style={{
-          background: white,
-          border: `1px solid ${border}`,
-          borderRadius: 24,
-          padding: 24,
-          display: "grid",
-          gap: 14,
-        }}
-      >
-        <div style={{ fontSize: 22, fontWeight: 900, color: navy }}>Session Schedule</div>
-
-        <div
-          style={{
-            overflowX: "auto",
-            border: `1px solid ${border}`,
-            borderRadius: 14,
-          }}
-        >
-          <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff" }}>
-            <thead>
-              <tr>
-                {["Date", "Start", "End", "Room", "Lead", "Assigned"].map((label) => (
-                  <th
-                    key={label}
-                    style={{
-                      textAlign: "left",
-                      padding: "12px 10px",
-                      background: "#f8fbff",
-                      borderBottom: `1px solid ${border}`,
-                      fontSize: 13,
-                      color: slate,
-                    }}
-                  >
-                    {label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sessions.map((session, index) => (
-                <tr key={session.id || `${event.id}-${index}`}>
-                  <td style={td}>{formatSessionDate(session.date)}</td>
-                  <td style={td}>{session.startTime || "TBD"}</td>
-                  <td style={td}>{session.endTime || "TBD"}</td>
-                  <td style={td}>{session.room || session.roomRaw || "TBD"}</td>
-                  <td style={td}>{session.lead || "—"}</td>
-                  <td style={td}>
-                    {(session.employees || []).length ? (session.employees || []).join(", ") : "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-const linkBtn: React.CSSProperties = {
-  textDecoration: "none",
-  background: "#ffffff",
-  color: "#163a70",
-  border: "1px solid #d9e2ef",
-  borderRadius: 12,
-  padding: "12px 16px",
-  fontWeight: 800,
+const shell: React.CSSProperties = {
+  display: "grid",
+  gap: 20,
 };
 
-const primaryBtn: React.CSSProperties = {
-  textDecoration: "none",
+const heroCard: React.CSSProperties = {
+  background: "#ffffff",
+  border: "1px solid #d4deeb",
+  borderRadius: 28,
+  padding: 26,
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 16,
+  alignItems: "flex-start",
+  flexWrap: "wrap",
+  boxShadow: "0 12px 28px rgba(18,55,107,0.07)",
+};
+
+const card: React.CSSProperties = {
+  background: "#ffffff",
+  border: "1px solid #d4deeb",
+  borderRadius: 24,
+  padding: 22,
+  display: "grid",
+  gap: 16,
+  boxShadow: "0 12px 28px rgba(18,55,107,0.07)",
+};
+
+const title: React.CSSProperties = {
+  fontSize: 30,
+  fontWeight: 900,
+  color: "#12376b",
+};
+
+const heroTitle: React.CSSProperties = {
+  fontSize: 36,
+  fontWeight: 900,
+  color: "#12376b",
+};
+
+const subtle: React.CSSProperties = {
+  fontSize: 15,
+  color: "#61748e",
+  lineHeight: 1.5,
+};
+
+const pill: React.CSSProperties = {
+  background: "#edf4ff",
+  color: "#1E5AA8",
+  border: "1px solid #d4deeb",
+  borderRadius: 999,
+  padding: "8px 14px",
+  fontWeight: 800,
+  fontSize: 13,
+};
+
+const statsGrid: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: 18,
+};
+
+const statCard: React.CSSProperties = {
+  background: "#ffffff",
+  border: "1px solid #d4deeb",
+  borderRadius: 22,
+  padding: 20,
+  boxShadow: "0 12px 28px rgba(18,55,107,0.07)",
+};
+
+const statLabel: React.CSSProperties = {
+  fontSize: 13,
+  fontWeight: 800,
+  color: "#61748e",
+};
+
+const statValue: React.CSSProperties = {
+  fontSize: 28,
+  fontWeight: 900,
+  color: "#12376b",
+  marginTop: 10,
+  lineHeight: 1.2,
+};
+
+const sectionTitle: React.CSSProperties = {
+  fontSize: 22,
+  fontWeight: 900,
+  color: "#12376b",
+};
+
+const infoGrid: React.CSSProperties = {
+  display: "grid",
+  gap: 12,
+};
+
+const infoRow: React.CSSProperties = {
+  background: "#f8fbff",
+  border: "1px solid #e4edf7",
+  borderRadius: 16,
+  padding: 16,
+  display: "grid",
+  gap: 6,
+};
+
+const infoLabel: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 800,
+  color: "#61748e",
+};
+
+const infoValue: React.CSSProperties = {
+  fontSize: 16,
+  color: "#12376b",
+  lineHeight: 1.5,
+};
+
+const buttonRow: React.CSSProperties = {
+  display: "flex",
+  gap: 12,
+  flexWrap: "wrap",
+};
+
+const blueBtn: React.CSSProperties = {
   background: "#1E5AA8",
   color: "#fff",
-  borderRadius: 12,
-  padding: "12px 16px",
-  fontWeight: 800,
+  borderRadius: 14,
+  padding: "12px 18px",
+  fontWeight: 900,
+  textDecoration: "none",
 };
 
-const secondaryBtn: React.CSSProperties = {
-  textDecoration: "none",
+const greenBtn: React.CSSProperties = {
   background: "#2E8B57",
   color: "#fff",
-  borderRadius: 12,
-  padding: "12px 16px",
-  fontWeight: 800,
+  borderRadius: 14,
+  padding: "12px 18px",
+  fontWeight: 900,
+  textDecoration: "none",
+};
+
+const whiteBtn: React.CSSProperties = {
+  background: "#ffffff",
+  color: "#12376b",
+  border: "1px solid #d4deeb",
+  borderRadius: 14,
+  padding: "12px 18px",
+  fontWeight: 900,
+  textDecoration: "none",
+};
+
+const tableWrap: React.CSSProperties = {
+  overflowX: "auto",
+  border: "1px solid #d4deeb",
+  borderRadius: 16,
+};
+
+const table: React.CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  background: "#fff",
+};
+
+const th: React.CSSProperties = {
+  textAlign: "left",
+  padding: "14px 12px",
+  background: "#f8fbff",
+  borderBottom: "1px solid #d4deeb",
+  fontSize: 13,
+  color: "#61748e",
 };
 
 const td: React.CSSProperties = {
   padding: "12px 10px",
   borderBottom: "1px solid #eef2f7",
   fontSize: 14,
-  color: "#163a70",
+  color: "#12376b",
   verticalAlign: "top",
 };
