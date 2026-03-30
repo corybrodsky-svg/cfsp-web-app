@@ -3,7 +3,6 @@
 import Link from "next/link";
 
 const colors = {
-  bg: "#eef3f8",
   white: "#ffffff",
   navy: "#12376b",
   blue: "#1E5AA8",
@@ -11,7 +10,6 @@ const colors = {
   green: "#2E8B57",
   greenDark: "#256b45",
   border: "#d4deeb",
-  text: "#17345f",
   muted: "#61748e",
 };
 
@@ -54,7 +52,7 @@ export default function HomePage() {
           borderRadius: 34,
           border: `1px solid ${colors.border}`,
           minHeight: 300,
-          background: `linear-gradient(135deg, ${colors.blueDark} 0%, ${colors.blue} 50%, ${colors.greenDark} 100%)`,
+          background: `linear-gradient(135deg, ${colors.blueDark} 0%, ${colors.blue} 48%, ${colors.greenDark} 100%)`,
           boxShadow: "0 18px 40px rgba(18,55,107,0.14)",
         }}
       >
@@ -66,6 +64,7 @@ export default function HomePage() {
               "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.18), transparent 30%), radial-gradient(circle at 80% 30%, rgba(255,255,255,0.12), transparent 28%)",
           }}
         />
+
         <div
           style={{
             position: "relative",
@@ -91,6 +90,7 @@ export default function HomePage() {
                 filter: "drop-shadow(0 14px 28px rgba(0,0,0,0.16))",
               }}
             />
+
             <div
               style={{
                 marginTop: 20,

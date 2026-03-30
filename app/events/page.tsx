@@ -315,184 +315,198 @@ export default function EventsPage() {
           />
         </div>
 
-        {filteredEvents.map((event) => {
-          const isExpanded = expandedIds.includes(event.id);
-          const rooms = summarizeRooms(event);
-          const simOps = summarizeSimOps(event);
-          const leads = summarizeLeads(event);
-          const sessions = event.sessions || [];
+        {filteredEvents.length === 0 ? (
+          <div
+            style={{
+              border: `1px dashed ${colors.border}`,
+              borderRadius: 18,
+              padding: 30,
+              textAlign: "center",
+              color: colors.muted,
+            }}
+          >
+            No events found.
+          </div>
+        ) : (
+          filteredEvents.map((event) => {
+            const isExpanded = expandedIds.includes(event.id);
+            const rooms = summarizeRooms(event);
+            const simOps = summarizeSimOps(event);
+            const leads = summarizeLeads(event);
+            const sessions = event.sessions || [];
 
-          return (
-            <div
-              key={event.id}
-              style={{
-                background: "#fff",
-                border: `1px solid ${colors.border}`,
-                borderRadius: 24,
-                padding: 22,
-                display: "grid",
-                gap: 18,
-              }}
-            >
+            return (
               <div
+                key={event.id}
                 style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  alignItems: "flex-start",
-                  flexWrap: "wrap",
+                  background: "#fff",
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: 24,
+                  padding: 22,
+                  display: "grid",
+                  gap: 18,
                 }}
               >
-                <div>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: colors.navy }}>{event.name}</div>
-                  <div style={{ fontSize: 14, color: colors.muted, marginTop: 8 }}>
-                    Last updated: {new Date(event.updated_at).toLocaleString()}
-                  </div>
-                </div>
-
                 <div
                   style={{
-                    borderRadius: 999,
-                    padding: "8px 12px",
-                    border: `1px solid ${colors.border}`,
-                    color: colors.blue,
-                    fontWeight: 800,
-                    fontSize: 13,
-                    background: "#edf4ff",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    alignItems: "flex-start",
+                    flexWrap: "wrap",
                   }}
                 >
-                  {event.status}
-                </div>
-              </div>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                  gap: 14,
-                }}
-              >
-                {[
-                  { label: "Dates", value: getDisplayDates(event) },
-                  { label: "Sessions", value: sessions.length },
-                  { label: "Rooms", value: rooms.length },
-                  { label: "SP Coverage", value: `${event.sp_assigned} / ${event.sp_needed}` },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    style={{
-                      background: "#f8fbff",
-                      border: `1px solid #e4edf7`,
-                      borderRadius: 16,
-                      padding: 16,
-                    }}
-                  >
-                    <div style={{ fontSize: 12, fontWeight: 800, color: colors.muted }}>{item.label}</div>
-                    <div style={{ fontSize: 18, fontWeight: 900, color: colors.navy, marginTop: 8 }}>
-                      {item.value}
+                  <div>
+                    <div style={{ fontSize: 28, fontWeight: 900, color: colors.navy }}>{event.name}</div>
+                    <div style={{ fontSize: 14, color: colors.muted, marginTop: 8 }}>
+                      Last updated: {new Date(event.updated_at).toLocaleString()}
                     </div>
                   </div>
-                ))}
-              </div>
-
-              <div style={{ display: "grid", gap: 8, color: colors.navy, fontSize: 16 }}>
-                <div><strong>Assigned Sim Ops:</strong> {simOps.length ? simOps.join(", ") : "None shown"}</div>
-                <div><strong>Lead(s):</strong> {leads.length ? leads.join(", ") : "None shown"}</div>
-                <div><strong>Rooms:</strong> {rooms.length ? rooms.join(", ") : "None shown"}</div>
-              </div>
-
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <button onClick={() => toggleExpanded(event.id)} style={blueBtn}>
-                  {isExpanded ? "Hide Details" : "Expand"}
-                </button>
-
-                <Link href={`/events/${event.id}`} style={whiteBtn}>
-                  View
-                </Link>
-
-                <select
-                  value={event.status}
-                  onChange={(e) => updateEventStatus(event.id, e.target.value as EventStatus)}
-                  style={{
-                    height: 46,
-                    borderRadius: 14,
-                    border: `1px solid ${colors.border}`,
-                    padding: "0 12px",
-                    fontSize: 14,
-                    color: colors.navy,
-                  }}
-                >
-                  {statuses.map((status) => (
-                    <option key={status} value={status}>
-                      {status}
-                    </option>
-                  ))}
-                </select>
-
-                <button onClick={() => handleDelete(event.id)} style={softBtn}>
-                  Delete
-                </button>
-              </div>
-
-              {isExpanded ? (
-                <div
-                  style={{
-                    borderTop: `1px solid ${colors.border}`,
-                    paddingTop: 16,
-                    display: "grid",
-                    gap: 12,
-                  }}
-                >
-                  <div style={{ fontSize: 20, fontWeight: 900, color: colors.navy }}>Session Schedule</div>
 
                   <div
                     style={{
-                      overflowX: "auto",
+                      borderRadius: 999,
+                      padding: "8px 12px",
                       border: `1px solid ${colors.border}`,
-                      borderRadius: 16,
+                      color: colors.blue,
+                      fontWeight: 800,
+                      fontSize: 13,
+                      background: "#edf4ff",
                     }}
                   >
-                    <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff" }}>
-                      <thead>
-                        <tr>
-                          {["Date", "Start", "End", "Room", "Lead", "Assigned"].map((label) => (
-                            <th
-                              key={label}
-                              style={{
-                                textAlign: "left",
-                                padding: "14px 12px",
-                                background: "#f8fbff",
-                                borderBottom: `1px solid ${colors.border}`,
-                                fontSize: 13,
-                                color: colors.muted,
-                              }}
-                            >
-                              {label}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sessions.map((session, index) => (
-                          <tr key={session.id || `${event.id}-${index}`}>
-                            <td style={td}>{formatSessionDate(session.date)}</td>
-                            <td style={td}>{session.startTime || "TBD"}</td>
-                            <td style={td}>{session.endTime || "TBD"}</td>
-                            <td style={td}>{session.room || session.roomRaw || "TBD"}</td>
-                            <td style={td}>{session.lead || "—"}</td>
-                            <td style={td}>
-                              {(session.employees || []).length ? (session.employees || []).join(", ") : "—"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    {event.status}
                   </div>
                 </div>
-              ) : null}
-            </div>
-          );
-        })}
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                    gap: 14,
+                  }}
+                >
+                  {[
+                    { label: "Dates", value: getDisplayDates(event) },
+                    { label: "Sessions", value: sessions.length },
+                    { label: "Rooms", value: rooms.length },
+                    { label: "SP Coverage", value: `${event.sp_assigned} / ${event.sp_needed}` },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      style={{
+                        background: "#f8fbff",
+                        border: `1px solid #e4edf7`,
+                        borderRadius: 16,
+                        padding: 16,
+                      }}
+                    >
+                      <div style={{ fontSize: 12, fontWeight: 800, color: colors.muted }}>{item.label}</div>
+                      <div style={{ fontSize: 18, fontWeight: 900, color: colors.navy, marginTop: 8 }}>
+                        {item.value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display: "grid", gap: 8, color: colors.navy, fontSize: 16 }}>
+                  <div><strong>Assigned Sim Ops:</strong> {simOps.length ? simOps.join(", ") : "None shown"}</div>
+                  <div><strong>Lead(s):</strong> {leads.length ? leads.join(", ") : "None shown"}</div>
+                  <div><strong>Rooms:</strong> {rooms.length ? rooms.join(", ") : "None shown"}</div>
+                </div>
+
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                  <button onClick={() => toggleExpanded(event.id)} style={blueBtn}>
+                    {isExpanded ? "Hide Details" : "Expand"}
+                  </button>
+
+                  <Link href={`/events/${event.id}`} style={whiteBtn}>
+                    View
+                  </Link>
+
+                  <select
+                    value={event.status}
+                    onChange={(e) => updateEventStatus(event.id, e.target.value as EventStatus)}
+                    style={{
+                      height: 46,
+                      borderRadius: 14,
+                      border: `1px solid ${colors.border}`,
+                      padding: "0 12px",
+                      fontSize: 14,
+                      color: colors.navy,
+                    }}
+                  >
+                    {statuses.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button onClick={() => handleDelete(event.id)} style={softBtn}>
+                    Delete
+                  </button>
+                </div>
+
+                {isExpanded ? (
+                  <div
+                    style={{
+                      borderTop: `1px solid ${colors.border}`,
+                      paddingTop: 16,
+                      display: "grid",
+                      gap: 12,
+                    }}
+                  >
+                    <div style={{ fontSize: 20, fontWeight: 900, color: colors.navy }}>Session Schedule</div>
+
+                    <div
+                      style={{
+                        overflowX: "auto",
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: 16,
+                      }}
+                    >
+                      <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff" }}>
+                        <thead>
+                          <tr>
+                            {["Date", "Start", "End", "Room", "Lead", "Assigned"].map((label) => (
+                              <th
+                                key={label}
+                                style={{
+                                  textAlign: "left",
+                                  padding: "14px 12px",
+                                  background: "#f8fbff",
+                                  borderBottom: `1px solid ${colors.border}`,
+                                  fontSize: 13,
+                                  color: colors.muted,
+                                }}
+                              >
+                                {label}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sessions.map((session, index) => (
+                            <tr key={session.id || `${event.id}-${index}`}>
+                              <td style={td}>{formatSessionDate(session.date)}</td>
+                              <td style={td}>{session.startTime || "TBD"}</td>
+                              <td style={td}>{session.endTime || "TBD"}</td>
+                              <td style={td}>{session.room || session.roomRaw || "TBD"}</td>
+                              <td style={td}>{session.lead || "—"}</td>
+                              <td style={td}>
+                                {(session.employees || []).length ? (session.employees || []).join(", ") : "—"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })
+        )}
       </section>
     </div>
   );
