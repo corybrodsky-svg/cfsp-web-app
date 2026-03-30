@@ -1,55 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
-
-type EventItem = {
-  id: string;
-  title: string;
-  dateText: string;
-  status: "Needs SPs" | "Scheduled" | "In Progress" | "Completed" | "Canceled";
-  rooms: number;
-  spNeeded: number;
-  spAssigned: number;
-  simOpLead: string;
-  location: string;
-};
-
-const eventsSeed: EventItem[] = [
-  {
-    id: "n651-virtual",
-    title: "N651 Virtual",
-    dateText: "Apr 15–Apr 16",
-    status: "Needs SPs",
-    rooms: 4,
-    spNeeded: 6,
-    spAssigned: 2,
-    simOpLead: "Cory",
-    location: "Virtual",
-  },
-  {
-    id: "pa-spl-ipe",
-    title: "PA/SPL IPE",
-    dateText: "Apr 21",
-    status: "Scheduled",
-    rooms: 6,
-    spNeeded: 8,
-    spAssigned: 8,
-    simOpLead: "Kate",
-    location: "Elkins Park",
-  },
-  {
-    id: "dysphagia-sim",
-    title: "Dysphagia Simulation",
-    dateText: "Apr 15 & Apr 21",
-    status: "In Progress",
-    rooms: 8,
-    spNeeded: 10,
-    spAssigned: 7,
-    simOpLead: "Cory",
-    location: "CNHP",
-  },
-];
 
 const colors = {
   white: "#ffffff",
@@ -60,54 +11,9 @@ const colors = {
   greenDark: "#256b45",
   border: "#d4deeb",
   muted: "#61748e",
-  red: "#c84a3a",
 };
 
-function SummaryCard({
-  label,
-  value,
-  accent,
-  subtext,
-}: {
-  label: string;
-  value: number | string;
-  accent: string;
-  subtext: string;
-}) {
-  return (
-    <div
-      style={{
-        background: colors.white,
-        border: `1px solid ${colors.border}`,
-        borderRadius: 24,
-        padding: 24,
-        boxShadow: "0 12px 28px rgba(18,55,107,0.07)",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: 8,
-          background: accent,
-        }}
-      />
-      <div style={{ fontSize: 15, fontWeight: 800, color: colors.muted, marginBottom: 10 }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 48, fontWeight: 900, color: colors.navy, lineHeight: 1 }}>
-        {value}
-      </div>
-      <div style={{ fontSize: 14, color: colors.muted, marginTop: 10 }}>{subtext}</div>
-    </div>
-  );
-}
-
-function ActionCard({
+function HomeCard({
   href,
   title,
   text,
@@ -124,26 +30,19 @@ function ActionCard({
         background: colors.white,
         border: `1px solid ${colors.border}`,
         borderRadius: 24,
-        padding: 26,
+        padding: 24,
         color: colors.navy,
         boxShadow: "0 12px 28px rgba(18,55,107,0.07)",
         display: "block",
       }}
     >
-      <div style={{ fontSize: 28, fontWeight: 900, marginBottom: 12 }}>{title}</div>
+      <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>{title}</div>
       <div style={{ fontSize: 16, color: colors.muted, lineHeight: 1.6 }}>{text}</div>
     </Link>
   );
 }
 
-export default function DashboardPage() {
-  const summary = useMemo(() => {
-    const totalEvents = eventsSeed.length;
-    const totalAssigned = eventsSeed.reduce((sum, event) => sum + event.spAssigned, 0);
-    const needSPs = eventsSeed.filter((event) => event.spAssigned < event.spNeeded).length;
-    return { totalEvents, totalAssigned, needSPs };
-  }, []);
-
+export default function HomePage() {
   return (
     <div style={{ display: "grid", gap: 24 }}>
       <section
@@ -152,7 +51,7 @@ export default function DashboardPage() {
           overflow: "hidden",
           borderRadius: 34,
           border: `1px solid ${colors.border}`,
-          minHeight: 320,
+          minHeight: 300,
           background: `linear-gradient(135deg, ${colors.blueDark} 0%, ${colors.blue} 48%, ${colors.greenDark} 100%)`,
           boxShadow: "0 18px 40px rgba(18,55,107,0.14)",
         }}
@@ -165,6 +64,7 @@ export default function DashboardPage() {
               "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.18), transparent 30%), radial-gradient(circle at 80% 30%, rgba(255,255,255,0.12), transparent 28%)",
           }}
         />
+
         <div
           style={{
             position: "relative",
@@ -174,7 +74,7 @@ export default function DashboardPage() {
             gap: 24,
             alignItems: "center",
             padding: 34,
-            minHeight: 320,
+            minHeight: 300,
           }}
         >
           <div>
@@ -198,7 +98,7 @@ export default function DashboardPage() {
                 fontWeight: 700,
                 color: "#ffffff",
                 lineHeight: 1.45,
-                maxWidth: 740,
+                maxWidth: 760,
               }}
             >
               Clean control of scheduling, staffing, assignments, and event prep in one place.
@@ -223,14 +123,14 @@ export default function DashboardPage() {
             </div>
 
             <div style={{ display: "grid", gap: 14 }}>
-              <Link href="/upload-schedule" style={heroGreenBtn}>
-                Upload Schedule
+              <Link href="/dashboard" style={heroBlueBtn}>
+                Dashboard
               </Link>
               <Link href="/events" style={heroBlueBtn}>
                 Open Events
               </Link>
-              <Link href="/sp-directory" style={heroGhostBtn}>
-                SP Directory
+              <Link href="/upload-schedule" style={heroGreenBtn}>
+                Upload Schedule
               </Link>
             </div>
           </div>
@@ -240,51 +140,39 @@ export default function DashboardPage() {
       <section
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-          gap: 20,
-        }}
-      >
-        <SummaryCard
-          label="Total Events"
-          value={summary.totalEvents}
-          accent={colors.blue}
-          subtext="Visible in the current dashboard"
-        />
-        <SummaryCard
-          label="SPs Assigned"
-          value={summary.totalAssigned}
-          accent={colors.green}
-          subtext="Across visible events"
-        />
-        <SummaryCard
-          label="Need SPs"
-          value={summary.needSPs}
-          accent={colors.red}
-          subtext="Events below needed coverage"
-        />
-      </section>
-
-      <section
-        style={{
-          display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
           gap: 20,
         }}
       >
-        <ActionCard
+        <HomeCard
+          href="/login"
+          title="Login"
+          text="Sign in as SP, Sim Op, or Admin and move into the right part of the app."
+        />
+        <HomeCard
+          href="/dashboard"
+          title="Admin Dashboard"
+          text="Launch point for uploads, events, staffing, and overall control."
+        />
+        <HomeCard
           href="/events"
           title="Events"
-          text="View imported events, expand details, and manage schedules cleanly."
+          text="Review imported events, assignments, and session details in a cleaner way."
         />
-        <ActionCard
-          href="/upload-schedule"
-          title="Upload Schedule"
-          text="Import your Excel semester schedule and auto-generate events."
-        />
-        <ActionCard
+        <HomeCard
           href="/sp-directory"
           title="SP Directory"
-          text="Browse your SPs and prepare for assignment workflows."
+          text="Browse SPs, compare pools, and prepare assignments."
+        />
+        <HomeCard
+          href="/profile"
+          title="My Profile"
+          text="Personal dashboard and account area based on who is signed in."
+        />
+        <HomeCard
+          href="/upload-schedule"
+          title="Upload Schedule"
+          text="Import your Excel schedule and turn it into organized events."
         />
       </section>
     </div>
@@ -313,16 +201,4 @@ const heroGreenBtn: React.CSSProperties = {
   fontSize: 16,
   textAlign: "center",
   boxShadow: "0 12px 24px rgba(46,139,87,0.24)",
-};
-
-const heroGhostBtn: React.CSSProperties = {
-  textDecoration: "none",
-  background: "rgba(255,255,255,0.14)",
-  color: "#ffffff",
-  padding: "15px 18px",
-  borderRadius: 16,
-  fontWeight: 900,
-  fontSize: 16,
-  textAlign: "center",
-  border: "1px solid rgba(255,255,255,0.22)",
 };
