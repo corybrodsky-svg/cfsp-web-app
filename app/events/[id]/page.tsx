@@ -1,5 +1,20 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import SiteShell from "../../components/SiteShell";
+import {
+  EventRecord,
+  EventBlueprint,
+  formatIsoDateShort,
+  getBlueprintForEvent,
+  getEventById,
+  getEventDateLabel,
+  getEventLeads,
+  getEventRooms,
+  getEventSimOps,
+} from "../../lib/planningData";
 
 const gridStyle: CSSProperties = {
   display: "grid",
@@ -15,6 +30,50 @@ const cardStyle: CSSProperties = {
   boxShadow: "0 14px 30px rgba(23,61,112,0.08)",
 };
 
+const actionRowStyle: CSSProperties = {
+  display: "flex",
+  gap: "12px",
+  flexWrap: "wrap",
+};
+
+const buttonLinkStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  textDecoration: "none",
+  padding: "12px 16px",
+  borderRadius: "14px",
+  fontWeight: 800,
+};
+
+const tableWrapStyle: CSSProperties = {
+  overflowX: "auto",
+  border: "1px solid rgba(23,61,112,0.10)",
+  borderRadius: "18px",
+};
+
+const tableStyle: CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+};
+
+const thStyle: CSSProperties = {
+  textAlign: "left",
+  padding: "12px 10px",
+  borderBottom: "1px solid rgba(23,61,112,0.10)",
+  color: "#597391",
+  fontSize: "13px",
+  background: "rgba(243,248,252,0.85)",
+};
+
+const tdStyle: CSSProperties = {
+  padding: "12px 10px",
+  borderBottom: "1px solid rgba(23,61,112,0.08)",
+  color: "#173d70",
+  fontSize: "14px",
+  verticalAlign: "top",
+};
+
 export default function EventDetailPage({
   params,
 }: {
@@ -22,41 +81,156 @@ export default function EventDetailPage({
 }) {
   const eventId = decodeURIComponent(params.id);
 
-  return (
-    <SiteShell
-      title="Event Detail"
-      subtitle="This page is where event-specific staffing, logistics, assignments, blueprinting, and communication will converge."
-    >
-      <div style={gridStyle}>
+  const [event, setEvent] = useState<EventRecord | null>(null);
+  const [blueprint, setBlueprint] = useState<EventBlueprint | null>(null);
+
+  useEffect(() => {
+    const found = getEventById(eventId) || null;
+    setEvent(found);
+    setBlueprint(found ? getBlueprintForEvent(found.id) || null : null);
+  }, [eventId]);
+
+  const summary = useMemo(() => {
+    if (!event) return null;
+
+    return {
+      dates: getEventDateLabel(event),
+      rooms: getEventRooms(event),
+      simOps: getEventSimOps(event),
+      leads: getEventLeads(event),
+      sessions: event.sessions || [],
+    };
+  }, [event]);
+
+  if (!event || !summary) {
+    return (
+      <SiteShell
+        title="Event Detail"
+        subtitle="This event could not be found in the imported event store."
+      >
         <div style={cardStyle}>
           <div style={{ fontSize: "24px", fontWeight: 800, color: "#173d70", marginBottom: "12px" }}>
+            Event not found
+          </div>
+          <div style={{ color: "#597391", lineHeight: 1.7, marginBottom: "18px" }}>
+            Import the schedule first, or return to the Events page and open a currently available event.
+          </div>
+          <Link href="/events" style={{ ...buttonLinkStyle, background: "#173d70", color: "#ffffff" }}>
+            Back to Events
+          </Link>
+        </div>
+      </SiteShell>
+    );
+  }
+
+  return (
+    <SiteShell
+      title={event.name}
+      subtitle="This is now the real event operations page tied to your imported schedule data, blueprint, and sim-flow tools."
+    >
+      <div style={actionRowStyle}>
+        <Link
+          href={`/blueprints?eventId=${encodeURIComponent(event.id)}`}
+          style={{ ...buttonLinkStyle, background: "#173d70", color: "#ffffff" }}
+        >
+          Build Blueprint
+        </Link>
+
+        <Link
+          href={`/sim-flow?eventId=${encodeURIComponent(event.id)}`}
+          style={{ ...buttonLinkStyle, background: "#1d8a6a", color: "#ffffff" }}
+        >
+          Run Sim Flow
+        </Link>
+
+        <Link
+          href="/events"
+          style={{
+            ...buttonLinkStyle,
+            background: "#ffffff",
+            color: "#173d70",
+            border: "1px solid rgba(23,61,112,0.12)",
+          }}
+        >
+          Back to Events
+        </Link>
+      </div>
+
+      <div style={gridStyle}>
+        <div style={cardStyle}>
+          <div style={{ fontSize: "24px", fontWeight: 800, color: "#173d70", marginBottom: "14px" }}>
             Event Overview
           </div>
-          <div style={{ color: "#597391", lineHeight: 1.8 }}>
-            <strong style={{ color: "#173d70" }}>Event ID:</strong> {eventId}
-            <br />
-            <strong style={{ color: "#173d70" }}>Status:</strong> Needs full data binding
-            <br />
-            <strong style={{ color: "#173d70" }}>Purpose:</strong> unified event operations screen
+
+          <div style={{ display: "grid", gap: "10px", color: "#597391", lineHeight: 1.7 }}>
+            <div><strong style={{ color: "#173d70" }}>Status:</strong> {event.status}</div>
+            <div><strong style={{ color: "#173d70" }}>Dates:</strong> {summary.dates}</div>
+            <div><strong style={{ color: "#173d70" }}>SP Coverage:</strong> {event.sp_assigned} / {event.sp_needed}</div>
+            <div><strong style={{ color: "#173d70" }}>Sessions:</strong> {summary.sessions.length}</div>
+            <div><strong style={{ color: "#173d70" }}>Rooms:</strong> {summary.rooms.length ? summary.rooms.join(", ") : "None shown"}</div>
+            <div><strong style={{ color: "#173d70" }}>Assigned Sim Ops:</strong> {summary.simOps.length ? summary.simOps.join(", ") : "None shown"}</div>
+            <div><strong style={{ color: "#173d70" }}>Lead(s):</strong> {summary.leads.length ? summary.leads.join(", ") : "None shown"}</div>
           </div>
         </div>
 
         <div style={cardStyle}>
-          <div style={{ fontSize: "24px", fontWeight: 800, color: "#173d70", marginBottom: "12px" }}>
-            Planned sections
+          <div style={{ fontSize: "24px", fontWeight: 800, color: "#173d70", marginBottom: "14px" }}>
+            Blueprint Status
           </div>
-          <div style={{ color: "#597391", lineHeight: 1.8 }}>
-            • assignment management
-            <br />
-            • SP roster and confirmations
-            <br />
-            • timing and blueprint linkage
-            <br />
-            • sim flow output
-            <br />
-            • event prep email generation
-          </div>
+
+          {blueprint ? (
+            <div style={{ display: "grid", gap: "10px", color: "#597391", lineHeight: 1.7 }}>
+              <div><strong style={{ color: "#173d70" }}>Blueprint:</strong> {blueprint.blueprintName}</div>
+              <div><strong style={{ color: "#173d70" }}>Type:</strong> {blueprint.eventType}</div>
+              <div><strong style={{ color: "#173d70" }}>Start Time:</strong> {blueprint.startTime}</div>
+              <div><strong style={{ color: "#173d70" }}>Rounds:</strong> {blueprint.rounds}</div>
+              <div><strong style={{ color: "#173d70" }}>Encounter / Transition:</strong> {blueprint.encounterMinutes} / {blueprint.transitionMinutes} minutes</div>
+              <div><strong style={{ color: "#173d70" }}>Orientation / Debrief:</strong> {blueprint.orientationMinutes} / {blueprint.debriefMinutes} minutes</div>
+              <div><strong style={{ color: "#173d70" }}>Learners / Rooms:</strong> {blueprint.learnersPerRound} / {blueprint.roomCountOverride}</div>
+            </div>
+          ) : (
+            <div style={{ color: "#597391", lineHeight: 1.7 }}>
+              No blueprint has been saved for this event yet. Build one next, then use Sim Flow to calculate timing against the real uploaded event.
+            </div>
+          )}
         </div>
+      </div>
+
+      <div style={cardStyle}>
+        <div style={{ fontSize: "24px", fontWeight: 800, color: "#173d70", marginBottom: "14px" }}>
+          Imported Session Schedule
+        </div>
+
+        {summary.sessions.length === 0 ? (
+          <div style={{ color: "#597391" }}>No session rows are attached to this event yet.</div>
+        ) : (
+          <div style={tableWrapStyle}>
+            <table style={tableStyle}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>Date</th>
+                  <th style={thStyle}>Room</th>
+                  <th style={thStyle}>Start</th>
+                  <th style={thStyle}>End</th>
+                  <th style={thStyle}>Lead</th>
+                  <th style={thStyle}>Assigned</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.sessions.map((session, index) => (
+                  <tr key={session.id || `${event.id}-${index}`}>
+                    <td style={tdStyle}>{formatIsoDateShort(session.date)}</td>
+                    <td style={tdStyle}>{session.room || session.roomRaw || "TBD"}</td>
+                    <td style={tdStyle}>{session.startTime || "TBD"}</td>
+                    <td style={tdStyle}>{session.endTime || "TBD"}</td>
+                    <td style={tdStyle}>{session.lead || "—"}</td>
+                    <td style={tdStyle}>{(session.employees || []).length ? (session.employees || []).join(", ") : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </SiteShell>
   );
