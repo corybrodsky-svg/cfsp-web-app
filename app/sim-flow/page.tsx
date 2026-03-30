@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import type { CSSProperties } from "react";
 import SiteShell from "../components/SiteShell";
 import {
@@ -66,9 +65,6 @@ function getKindBadge(kind: string): CSSProperties {
 }
 
 export default function SimFlowPage() {
-  const searchParams = useSearchParams();
-  const queryEventId = searchParams.get("eventId") || "";
-
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [selectedEventId, setSelectedEventId] = useState("");
   const [event, setEvent] = useState<EventRecord | null>(null);
@@ -79,9 +75,8 @@ export default function SimFlowPage() {
     setEvents(nextEvents);
 
     const fallbackId = nextEvents[0]?.id || "";
-    const chosenId = queryEventId || fallbackId;
-    setSelectedEventId(chosenId);
-  }, [queryEventId]);
+    setSelectedEventId(fallbackId);
+  }, []);
 
   useEffect(() => {
     if (!selectedEventId) {
@@ -179,7 +174,7 @@ export default function SimFlowPage() {
 
                   <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
                     <Link
-                      href={`/blueprints?eventId=${encodeURIComponent(event.id)}`}
+                      href="/blueprints"
                       style={{
                         display: "inline-flex",
                         alignItems: "center",

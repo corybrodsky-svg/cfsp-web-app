@@ -130,14 +130,14 @@ export default function EventDetailPage({
     >
       <div style={actionRowStyle}>
         <Link
-          href={`/blueprints?eventId=${encodeURIComponent(event.id)}`}
+          href="/blueprints"
           style={{ ...buttonLinkStyle, background: "#173d70", color: "#ffffff" }}
         >
           Build Blueprint
         </Link>
 
         <Link
-          href={`/sim-flow?eventId=${encodeURIComponent(event.id)}`}
+          href="/sim-flow"
           style={{ ...buttonLinkStyle, background: "#1d8a6a", color: "#ffffff" }}
         >
           Run Sim Flow
@@ -224,7 +224,9 @@ export default function EventDetailPage({
                     <td style={tdStyle}>{session.startTime || "TBD"}</td>
                     <td style={tdStyle}>{session.endTime || "TBD"}</td>
                     <td style={tdStyle}>{session.lead || "—"}</td>
-                    <td style={tdStyle}>{(session.employees || []).length ? (session.employees || []).join(", ") : "—"}</td>
+                    <td style={tdStyle}>
+                      {(session.employees || []).length ? (session.employees || []).join(", ") : "—"}
+                    </td>
                   </tr>
                 ))}
               </tbody>

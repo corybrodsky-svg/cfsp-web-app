@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import type { CSSProperties } from "react";
 import SiteShell from "../components/SiteShell";
 import {
@@ -62,9 +61,6 @@ function makeSegment(name = "New Segment", duration = 10, roomType = "Exam Room"
 }
 
 export default function BlueprintsPage() {
-  const searchParams = useSearchParams();
-  const queryEventId = searchParams.get("eventId") || "";
-
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [selectedEventId, setSelectedEventId] = useState("");
   const [blueprint, setBlueprint] = useState<EventBlueprint | null>(null);
@@ -75,17 +71,16 @@ export default function BlueprintsPage() {
     setEvents(nextEvents);
 
     const fallbackId = nextEvents[0]?.id || "";
-    const chosenId = queryEventId || fallbackId;
-    setSelectedEventId(chosenId);
+    setSelectedEventId(fallbackId);
 
-    if (chosenId) {
-      const existing = getBlueprintForEvent(chosenId);
-      const event = nextEvents.find((item) => item.id === chosenId);
+    if (fallbackId) {
+      const existing = getBlueprintForEvent(fallbackId);
+      const event = nextEvents.find((item) => item.id === fallbackId);
       setBlueprint(existing || (event ? buildDefaultBlueprint(event) : null));
     } else {
       setBlueprint(null);
     }
-  }, [queryEventId]);
+  }, []);
 
   useEffect(() => {
     if (!selectedEventId) return;
@@ -520,7 +515,7 @@ export default function BlueprintsPage() {
 
             {selectedEvent ? (
               <Link
-                href={`/sim-flow?eventId=${encodeURIComponent(selectedEvent.id)}`}
+                href="/sim-flow"
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
