@@ -41,10 +41,17 @@ const colors = {
   white: "#ffffff",
   navy: "#12376b",
   blue: "#1E5AA8",
+  blueDark: "#163a70",
   green: "#2E8B57",
+  greenDark: "#256b45",
   border: "#d4deeb",
   muted: "#61748e",
   red: "#c84a3a",
+  redSoft: "#fbefec",
+  greenSoft: "#edf8f1",
+  blueSoft: "#edf4ff",
+  graySoft: "#eef2f7",
+  pageBg: "#eef3f8",
 };
 
 const statuses: EventStatus[] = [
@@ -109,19 +116,62 @@ function formatSessionDate(value?: string) {
 }
 
 function summarizeRooms(event: EventItem) {
-  return uniqueStrings((event.sessions || []).map((s) => s.room || s.roomRaw || "").filter(Boolean));
+  return uniqueStrings(
+    (event.sessions || []).map((session) => session.room || session.roomRaw || "").filter(Boolean)
+  );
 }
 
 function summarizeSimOps(event: EventItem) {
   const direct = uniqueStrings(event.assignedSimOps || []);
   if (direct.length) return direct;
-  return uniqueStrings((event.sessions || []).flatMap((s) => s.employees || []));
+  return uniqueStrings((event.sessions || []).flatMap((session) => session.employees || []));
 }
 
 function summarizeLeads(event: EventItem) {
   const direct = uniqueStrings(event.leadSimOps || []);
   if (direct.length) return direct;
-  return uniqueStrings((event.sessions || []).map((s) => s.lead || ""));
+  return uniqueStrings((event.sessions || []).map((session) => session.lead || ""));
+}
+
+function getStatusPillStyle(status: EventStatus): React.CSSProperties {
+  switch (status) {
+    case "Needs SPs":
+      return {
+        background: colors.redSoft,
+        color: colors.red,
+        border: `1px solid #f1c9c2`,
+      };
+    case "Scheduled":
+      return {
+        background: colors.greenSoft,
+        color: colors.greenDark,
+        border: `1px solid #c9e5d3`,
+      };
+    case "In Progress":
+      return {
+        background: "#fff6e8",
+        color: "#b97814",
+        border: `1px solid #f1ddb3`,
+      };
+    case "Completed":
+      return {
+        background: colors.blueSoft,
+        color: colors.blueDark,
+        border: `1px solid #cfe0f6`,
+      };
+    case "Canceled":
+      return {
+        background: colors.graySoft,
+        color: colors.muted,
+        border: `1px solid ${colors.border}`,
+      };
+    default:
+      return {
+        background: colors.graySoft,
+        color: colors.navy,
+        border: `1px solid ${colors.border}`,
+      };
+  }
 }
 
 export default function EventsPage() {
@@ -149,7 +199,13 @@ export default function EventsPage() {
   function updateEventStatus(id: string, status: EventStatus) {
     setEvents((prev) =>
       prev.map((event) =>
-        event.id === id ? { ...event, status, updated_at: new Date().toISOString() } : event
+        event.id === id
+          ? {
+              ...event,
+              status,
+              updated_at: new Date().toISOString(),
+            }
+          : event
       )
     );
   }
@@ -199,9 +255,9 @@ export default function EventsPage() {
 
   const summary = useMemo(() => {
     const total = events.length;
-    const drafts = events.filter((e) => e.status === "Draft").length;
-    const needsSPs = events.filter((e) => e.status === "Needs SPs").length;
-    const scheduled = events.filter((e) => e.status === "Scheduled").length;
+    const drafts = events.filter((event) => event.status === "Draft").length;
+    const needsSPs = events.filter((event) => event.status === "Needs SPs").length;
+    const scheduled = events.filter((event) => event.status === "Scheduled").length;
     return { total, drafts, needsSPs, scheduled };
   }, [events]);
 
@@ -209,28 +265,53 @@ export default function EventsPage() {
     <div style={{ display: "grid", gap: 24 }}>
       <section
         style={{
-          background: colors.white,
+          position: "relative",
+          overflow: "hidden",
+          borderRadius: 34,
           border: `1px solid ${colors.border}`,
-          borderRadius: 30,
-          padding: 28,
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 16,
-          alignItems: "center",
-          flexWrap: "wrap",
-          boxShadow: "0 12px 28px rgba(18,55,107,0.07)",
+          background: `linear-gradient(135deg, ${colors.blueDark} 0%, ${colors.blue} 50%, ${colors.greenDark} 100%)`,
+          boxShadow: "0 18px 40px rgba(18,55,107,0.14)",
         }}
       >
-        <div>
-          <div style={{ fontSize: 40, fontWeight: 900, color: colors.navy }}>Events</div>
-          <div style={{ fontSize: 17, color: colors.muted, marginTop: 8 }}>
-            Imported schedule events, expandable details, and cleaner organization.
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background:
+              "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.18), transparent 30%), radial-gradient(circle at 80% 30%, rgba(255,255,255,0.12), transparent 28%)",
+          }}
+        />
+        <div
+          style={{
+            position: "relative",
+            zIndex: 2,
+            padding: 30,
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 18,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 42, fontWeight: 900, color: "#ffffff" }}>Events</div>
+            <div
+              style={{
+                fontSize: 18,
+                color: "rgba(255,255,255,0.9)",
+                marginTop: 10,
+                maxWidth: 720,
+                lineHeight: 1.5,
+              }}
+            >
+              Imported schedule events, expandable details, and cleaner organization.
+            </div>
           </div>
-        </div>
 
-        <Link href="/upload-schedule" style={greenBtn}>
-          Upload Schedule
-        </Link>
+          <Link href="/upload-schedule" style={greenBtn}>
+            Upload Schedule
+          </Link>
+        </div>
       </section>
 
       <section
@@ -296,21 +377,22 @@ export default function EventsPage() {
             flexWrap: "wrap",
           }}
         >
-          <div style={{ fontSize: 22, fontWeight: 900, color: colors.navy }}>All Events</div>
+          <div style={{ fontSize: 24, fontWeight: 900, color: colors.navy }}>All Events</div>
 
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by event, room, Sim Op, lead..."
             style={{
-              width: 360,
+              width: 380,
               maxWidth: "100%",
-              height: 48,
+              height: 50,
               borderRadius: 14,
               border: `1px solid ${colors.border}`,
               padding: "0 14px",
               fontSize: 15,
               color: colors.navy,
+              background: "#fff",
             }}
           />
         </div>
@@ -320,9 +402,10 @@ export default function EventsPage() {
             style={{
               border: `1px dashed ${colors.border}`,
               borderRadius: 18,
-              padding: 30,
+              padding: 32,
               textAlign: "center",
               color: colors.muted,
+              fontSize: 15,
             }}
           >
             No events found.
@@ -357,7 +440,7 @@ export default function EventsPage() {
                   }}
                 >
                   <div>
-                    <div style={{ fontSize: 28, fontWeight: 900, color: colors.navy }}>{event.name}</div>
+                    <div style={{ fontSize: 30, fontWeight: 900, color: colors.navy }}>{event.name}</div>
                     <div style={{ fontSize: 14, color: colors.muted, marginTop: 8 }}>
                       Last updated: {new Date(event.updated_at).toLocaleString()}
                     </div>
@@ -366,12 +449,10 @@ export default function EventsPage() {
                   <div
                     style={{
                       borderRadius: 999,
-                      padding: "8px 12px",
-                      border: `1px solid ${colors.border}`,
-                      color: colors.blue,
+                      padding: "9px 13px",
                       fontWeight: 800,
                       fontSize: 13,
-                      background: "#edf4ff",
+                      ...getStatusPillStyle(event.status),
                     }}
                   >
                     {event.status}
@@ -409,9 +490,15 @@ export default function EventsPage() {
                 </div>
 
                 <div style={{ display: "grid", gap: 8, color: colors.navy, fontSize: 16 }}>
-                  <div><strong>Assigned Sim Ops:</strong> {simOps.length ? simOps.join(", ") : "None shown"}</div>
-                  <div><strong>Lead(s):</strong> {leads.length ? leads.join(", ") : "None shown"}</div>
-                  <div><strong>Rooms:</strong> {rooms.length ? rooms.join(", ") : "None shown"}</div>
+                  <div>
+                    <strong>Assigned Sim Ops:</strong> {simOps.length ? simOps.join(", ") : "None shown"}
+                  </div>
+                  <div>
+                    <strong>Lead(s):</strong> {leads.length ? leads.join(", ") : "None shown"}
+                  </div>
+                  <div>
+                    <strong>Rooms:</strong> {rooms.length ? rooms.join(", ") : "None shown"}
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
@@ -433,6 +520,7 @@ export default function EventsPage() {
                       padding: "0 12px",
                       fontSize: 14,
                       color: colors.navy,
+                      background: "#fff",
                     }}
                   >
                     {statuses.map((status) => (
@@ -494,7 +582,9 @@ export default function EventsPage() {
                               <td style={td}>{session.room || session.roomRaw || "TBD"}</td>
                               <td style={td}>{session.lead || "—"}</td>
                               <td style={td}>
-                                {(session.employees || []).length ? (session.employees || []).join(", ") : "—"}
+                                {(session.employees || []).length
+                                  ? (session.employees || []).join(", ")
+                                  : "—"}
                               </td>
                             </tr>
                           ))}
