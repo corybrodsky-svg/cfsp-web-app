@@ -82,7 +82,7 @@ export function uniqueStrings(values: string[]) {
 export function parseClockToMinutes(value?: string) {
   if (!value) return null;
 
-  const raw = value.trim();
+  const raw = String(value).trim();
   if (!raw) return null;
 
   const ampmMatch = raw.match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
@@ -136,13 +136,52 @@ export function diffMinutes(start?: string, end?: string) {
 
 export function formatIsoDateShort(value?: string) {
   if (!value) return "TBD";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const dt = new Date(`${value}T00:00:00`);
-    if (!Number.isNaN(dt.getTime())) {
-      return `${dt.getMonth() + 1}/${dt.getDate()}/${String(dt.getFullYear()).slice(-2)}`;
+
+  const raw = String(value).trim();
+  if (!raw) return "TBD";
+  if (raw.toLowerCase().includes("nan")) return "TBD";
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const parts = raw.split("-");
+    const year = Number(parts[0]);
+    const month = Number(parts[1]);
+    const day = Number(parts[2]);
+
+    if (
+      Number.isFinite(year) &&
+      Number.isFinite(month) &&
+      Number.isFinite(day) &&
+      month >= 1 &&
+      month <= 12 &&
+      day >= 1 &&
+      day <= 31
+    ) {
+      return `${month}/${day}/${String(year).slice(-2)}`;
     }
   }
-  return value;
+
+  if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(raw)) {
+    return raw;
+  }
+
+  return "TBD";
+}
+
+function sanitizeLegacyDateText(value?: string) {
+  if (!value) return "";
+
+  const raw = String(value).trim();
+  if (!raw) return "";
+  if (raw.toLowerCase().includes("nan")) return "";
+
+  const cleanedParts = raw
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => formatIsoDateShort(part))
+    .filter((part) => part !== "TBD");
+
+  return cleanedParts.join(", ");
 }
 
 export function getStoredEvents(): EventRecord[] {
@@ -206,9 +245,12 @@ export function getEventDateLabel(event: EventRecord) {
       .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value))
   ).sort();
 
-  if (!dates.length) return event.date_text || "Date TBD";
+  if (dates.length) {
+    return dates.map(formatIsoDateShort).join(", ");
+  }
 
-  return dates.map(formatIsoDateShort).join(", ");
+  const cleanedFallback = sanitizeLegacyDateText(event.date_text);
+  return cleanedFallback || "Date TBD";
 }
 
 export function inferEventStartTime(event: EventRecord) {
@@ -244,6 +286,10 @@ export function inferRoomCount(event: EventRecord) {
 export function inferLearnersPerRound(event: EventRecord) {
   const roomCount = inferRoomCount(event);
   return roomCount;
+}
+
+function cryptoSafeId(prefix: string) {
+  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export function buildDefaultBlueprint(event: EventRecord): EventBlueprint {
@@ -284,10 +330,6 @@ export function buildDefaultBlueprint(event: EventRecord): EventBlueprint {
     ],
     updatedAt: new Date().toISOString(),
   };
-}
-
-function cryptoSafeId(prefix: string) {
-  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export function getStoredBlueprints(): EventBlueprint[] {
