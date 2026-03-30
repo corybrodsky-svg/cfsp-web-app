@@ -52,7 +52,6 @@ const eventsSeed: EventItem[] = [
 ];
 
 const colors = {
-  bg: "#eef3f8",
   white: "#ffffff",
   navy: "#12376b",
   blue: "#1E5AA8",
@@ -60,12 +59,8 @@ const colors = {
   green: "#2E8B57",
   greenDark: "#256b45",
   border: "#d4deeb",
-  text: "#17345f",
   muted: "#61748e",
   red: "#c84a3a",
-  redSoft: "#fbefec",
-  greenSoft: "#edf8f1",
-  blueSoft: "#edf4ff",
 };
 
 function SummaryCard({

@@ -1,10 +1,6 @@
-import "./globals.css";
-import Link from "next/link";
+"use client";
 
-export const metadata = {
-  title: "Conflict-Free SP",
-  description: "Simulation Scheduling Platform",
-};
+import Link from "next/link";
 
 const colors = {
   bg: "#eef3f8",
@@ -19,151 +15,190 @@ const colors = {
   muted: "#61748e",
 };
 
-function NavLink({
+function HomeCard({
   href,
-  label,
+  title,
+  text,
 }: {
   href: string;
-  label: string;
+  title: string;
+  text: string;
 }) {
   return (
     <Link
       href={href}
       style={{
         textDecoration: "none",
-        color: colors.text,
-        fontWeight: 800,
-        fontSize: 15,
-        padding: "14px 18px",
-        borderRadius: 14,
+        background: colors.white,
         border: `1px solid ${colors.border}`,
-        background: "rgba(255,255,255,0.96)",
-        boxShadow: "0 4px 12px rgba(18,55,107,0.05)",
+        borderRadius: 24,
+        padding: 24,
+        color: colors.navy,
+        boxShadow: "0 12px 28px rgba(18,55,107,0.07)",
+        display: "block",
       }}
     >
-      {label}
+      <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>{title}</div>
+      <div style={{ fontSize: 16, color: colors.muted, lineHeight: 1.6 }}>{text}</div>
     </Link>
   );
 }
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function HomePage() {
   return (
-    <html lang="en">
-      <body
+    <div style={{ display: "grid", gap: 24 }}>
+      <section
         style={{
-          margin: 0,
-          background: colors.bg,
-          color: colors.text,
-          fontFamily:
-            'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          position: "relative",
+          overflow: "hidden",
+          borderRadius: 34,
+          border: `1px solid ${colors.border}`,
+          minHeight: 300,
+          background: `linear-gradient(135deg, ${colors.blueDark} 0%, ${colors.blue} 50%, ${colors.greenDark} 100%)`,
+          boxShadow: "0 18px 40px rgba(18,55,107,0.14)",
         }}
       >
-        <header
+        <div
           style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 100,
-            background: "rgba(255,255,255,0.94)",
-            backdropFilter: "blur(10px)",
-            borderBottom: `1px solid ${colors.border}`,
-            boxShadow: "0 6px 18px rgba(18,55,107,0.05)",
+            position: "absolute",
+            inset: 0,
+            background:
+              "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.18), transparent 30%), radial-gradient(circle at 80% 30%, rgba(255,255,255,0.12), transparent 28%)",
+          }}
+        />
+        <div
+          style={{
+            position: "relative",
+            zIndex: 2,
+            display: "grid",
+            gridTemplateColumns: "1.15fr 0.85fr",
+            gap: 24,
+            alignItems: "center",
+            padding: 34,
+            minHeight: 300,
           }}
         >
-          <div
-            style={{
-              maxWidth: 1320,
-              margin: "0 auto",
-              padding: "18px 22px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 20,
-              flexWrap: "wrap",
-            }}
-          >
-           <Link
-  href="/dashboard"
-  style={{
-    display: "flex",
-    alignItems: "center",
-    gap: 18,
-    textDecoration: "none",
-    minWidth: 0,
-  }}
->
-  <div
-    style={{
-      height: 64,
-      width: 240,
-      display: "flex",
-      alignItems: "center",
-      overflow: "hidden",
-      flexShrink: 0,
-    }}
-  >
-    <img
-      src="/logo.png"
-      alt="Conflict-Free SP"
-      style={{
-        maxHeight: "100%",
-        maxWidth: "100%",
-        width: "auto",
-        height: "auto",
-        display: "block",
-        objectFit: "contain",
-      }}
-    />
-  </div>
-
-  <div>
-    <div
-      style={{
-        fontSize: 22,
-        fontWeight: 900,
-        color: "#12376b",
-        lineHeight: 1.05,
-      }}
-    >
-      Conflict-Free SP
-    </div>
-    <div
-      style={{
-        fontSize: 14,
-        color: "#61748e",
-        marginTop: 4,
-        fontWeight: 600,
-      }}
-    >
-      Simulation Scheduling Platform
-    </div>
-  </div>
-</Link>
-
-            <nav
+          <div>
+            <img
+              src="/cfsp-hero.png"
+              alt="Conflict-Free SP"
               style={{
-                display: "flex",
-                gap: 12,
-                flexWrap: "wrap",
-                alignItems: "center",
+                width: "100%",
+                maxWidth: 620,
+                height: "auto",
+                display: "block",
+                objectFit: "contain",
+                filter: "drop-shadow(0 14px 28px rgba(0,0,0,0.16))",
+              }}
+            />
+            <div
+              style={{
+                marginTop: 20,
+                fontSize: 22,
+                fontWeight: 700,
+                color: "#ffffff",
+                lineHeight: 1.45,
+                maxWidth: 760,
               }}
             >
-              <NavLink href="/dashboard" label="Dashboard" />
-              <NavLink href="/events" label="Events" />
-              <NavLink href="/upload-schedule" label="Upload Schedule" />
-              <NavLink href="/sp-directory" label="SP Directory" />
-              <NavLink href="/profile" label="Profile" />
-            </nav>
+              Clean control of scheduling, staffing, assignments, and event prep in one place.
+            </div>
           </div>
-        </header>
 
-        <main style={{ maxWidth: 1320, margin: "0 auto", padding: 24 }}>
-          {children}
-        </main>
-      </body>
-    </html>
+          <div
+            style={{
+              justifySelf: "end",
+              width: "100%",
+              maxWidth: 420,
+              background: "rgba(255,255,255,0.10)",
+              border: "1px solid rgba(255,255,255,0.20)",
+              borderRadius: 28,
+              padding: 24,
+              backdropFilter: "blur(8px)",
+              boxShadow: "0 14px 30px rgba(0,0,0,0.10)",
+            }}
+          >
+            <div style={{ fontSize: 18, fontWeight: 900, color: "#ffffff", marginBottom: 12 }}>
+              Quick Actions
+            </div>
+
+            <div style={{ display: "grid", gap: 14 }}>
+              <Link href="/dashboard" style={heroBlueBtn}>
+                Dashboard
+              </Link>
+              <Link href="/events" style={heroBlueBtn}>
+                Open Events
+              </Link>
+              <Link href="/upload-schedule" style={heroGreenBtn}>
+                Upload Schedule
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+          gap: 20,
+        }}
+      >
+        <HomeCard
+          href="/login"
+          title="Login"
+          text="Sign in as SP, Sim Op, or Admin and move into the right part of the app."
+        />
+        <HomeCard
+          href="/dashboard"
+          title="Admin Dashboard"
+          text="Launch point for uploads, events, staffing, and overall control."
+        />
+        <HomeCard
+          href="/events"
+          title="Events"
+          text="Review imported events, assignments, and session details in a cleaner way."
+        />
+        <HomeCard
+          href="/sp-directory"
+          title="SP Directory"
+          text="Browse SPs, compare pools, and prepare assignments."
+        />
+        <HomeCard
+          href="/profile"
+          title="My Profile"
+          text="Personal dashboard and account area based on who is signed in."
+        />
+        <HomeCard
+          href="/upload-schedule"
+          title="Upload Schedule"
+          text="Import your Excel schedule and turn it into organized events."
+        />
+      </section>
+    </div>
   );
 }
+
+const heroBlueBtn: React.CSSProperties = {
+  textDecoration: "none",
+  background: "#1E5AA8",
+  color: "#ffffff",
+  padding: "15px 18px",
+  borderRadius: 16,
+  fontWeight: 900,
+  fontSize: 16,
+  textAlign: "center",
+  boxShadow: "0 12px 24px rgba(30,90,168,0.24)",
+};
+
+const heroGreenBtn: React.CSSProperties = {
+  textDecoration: "none",
+  background: "#2E8B57",
+  color: "#ffffff",
+  padding: "15px 18px",
+  borderRadius: 16,
+  fontWeight: 900,
+  fontSize: 16,
+  textAlign: "center",
+  boxShadow: "0 12px 24px rgba(46,139,87,0.24)",
+};
