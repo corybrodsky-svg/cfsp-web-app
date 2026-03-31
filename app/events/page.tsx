@@ -18,6 +18,8 @@ type EventRecord = {
   simOpsLabel: string;
   leadsLabel: string;
   spNeeded: number;
+  blueprintUrl?: string;
+  simFlowUrl?: string;
   raw: AnyRecord;
 };
 
@@ -123,15 +125,6 @@ const dangerButton: React.CSSProperties = {
   color: "#173b6c",
 };
 
-const badgeStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  padding: "8px 14px",
-  borderRadius: "999px",
-  fontSize: "14px",
-  fontWeight: 800,
-};
-
 const hiresWrap: React.CSSProperties = {
   marginTop: "16px",
   padding: "16px",
@@ -153,12 +146,12 @@ const sectionLabel: React.CSSProperties = {
   color: "#173b6c",
 };
 
-function safeString(value: any): string {
+function safeString(value: unknown): string {
   if (value === null || value === undefined) return "";
   return String(value).trim();
 }
 
-function toNumber(value: any): number {
+function toNumber(value: unknown): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
 }
@@ -177,7 +170,9 @@ function extractAllRows(moduleLike: AnyRecord): AnyRecord[] {
   Object.values(moduleLike).forEach((value) => {
     if (Array.isArray(value)) {
       value.forEach((row) => {
-        if (row && typeof row === "object") rows.push(row);
+        if (row && typeof row === "object") {
+          rows.push(row as AnyRecord);
+        }
       });
     }
   });
@@ -192,6 +187,7 @@ function buildEvents(rows: AnyRecord[]): EventRecord[] {
       safeString(row.title) ||
       safeString(row.event_name) ||
       safeString(row.eventName);
+
     return Boolean(maybeName);
   });
 
@@ -209,49 +205,19 @@ function buildEvents(rows: AnyRecord[]): EventRecord[] {
       safeString(row.eventId) ||
       slugify(name);
 
-    const dates =
-      safeString(row.date_text) ||
-      safeString(row.dateText) ||
-      safeString(row.event_date) ||
-      safeString(row.eventDate) ||
-      safeString(row.date) ||
-      "No date listed";
+    const blueprintUrl =
+      safeString(row.blueprint_url) ||
+      safeString(row.blueprintUrl) ||
+      safeString(row.blueprint_link) ||
+      safeString(row.blueprintLink) ||
+      safeString(row.blueprint);
 
-    const sessionCount =
-      toNumber(row.session_count) ||
-      toNumber(row.sessionCount) ||
-      toNumber(row.sessions) ||
-      0;
-
-    const roomCount =
-      toNumber(row.room_count) ||
-      toNumber(row.roomCount) ||
-      toNumber(row.rooms_count) ||
-      0;
-
-    const roomsLabel =
-      safeString(row.rooms_label) ||
-      safeString(row.roomsLabel) ||
-      safeString(row.rooms) ||
-      safeString(row.location) ||
-      safeString(row.room) ||
-      "—";
-
-    const simOpsLabel =
-      safeString(row.sim_ops) ||
-      safeString(row.simOps) ||
-      safeString(row.assigned_staff) ||
-      safeString(row.staff) ||
-      safeString(row.sim_op) ||
-      safeString(row.simOp) ||
-      "—";
-
-    const leadsLabel =
-      safeString(row.leads) ||
-      safeString(row.lead) ||
-      safeString(row.faculty) ||
-      safeString(row.faculty_contact) ||
-      "—";
+    const simFlowUrl =
+      safeString(row.sim_flow_url) ||
+      safeString(row.simFlowUrl) ||
+      safeString(row.sim_flow_link) ||
+      safeString(row.simFlowLink) ||
+      safeString(row.simFlow);
 
     return {
       id,
@@ -261,17 +227,48 @@ function buildEvents(rows: AnyRecord[]): EventRecord[] {
         safeString(row.event_status) ||
         safeString(row.eventStatus) ||
         "Draft",
-      dateText: dates,
-      sessionCount,
-      roomCount,
-      roomsLabel,
-      simOpsLabel,
-      leadsLabel,
+      dateText:
+        safeString(row.date_text) ||
+        safeString(row.dateText) ||
+        safeString(row.event_date) ||
+        safeString(row.eventDate) ||
+        safeString(row.date) ||
+        "No date listed",
+      sessionCount:
+        toNumber(row.session_count) ||
+        toNumber(row.sessionCount) ||
+        toNumber(row.sessions),
+      roomCount:
+        toNumber(row.room_count) ||
+        toNumber(row.roomCount) ||
+        toNumber(row.rooms_count),
+      roomsLabel:
+        safeString(row.rooms_label) ||
+        safeString(row.roomsLabel) ||
+        safeString(row.rooms) ||
+        safeString(row.location) ||
+        safeString(row.room) ||
+        "—",
+      simOpsLabel:
+        safeString(row.sim_ops) ||
+        safeString(row.simOps) ||
+        safeString(row.assigned_staff) ||
+        safeString(row.staff) ||
+        safeString(row.sim_op) ||
+        safeString(row.simOp) ||
+        "—",
+      leadsLabel:
+        safeString(row.leads) ||
+        safeString(row.lead) ||
+        safeString(row.faculty) ||
+        safeString(row.faculty_contact) ||
+        "—",
       spNeeded:
         toNumber(row.sp_needed) ||
         toNumber(row.spNeeded) ||
-        toNumber(row.needed) ||
-        0,
+        toNumber(row.needed),
+      blueprintUrl: blueprintUrl || undefined,
+      simFlowUrl: simFlowUrl || undefined,
       raw: row,
     };
   });
@@ -288,11 +285,12 @@ function buildEvents(rows: AnyRecord[]): EventRecord[] {
 
 function loadSavedHires(): EventHire[] {
   if (typeof window === "undefined") return [];
+
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? (parsed as EventHire[]) : [];
   } catch {
     return [];
   }
@@ -303,26 +301,90 @@ function saveHires(hires: EventHire[]) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(hires));
 }
 
-function statusBadge(status: string): React.CSSProperties {
+function statusBadgeStyle(status: string): React.CSSProperties {
   const s = status.toLowerCase();
 
   if (s.includes("need")) {
-    return { ...badgeStyle, background: "#fef2f2", color: "#c2410c", border: "1px solid #fecaca" };
-  }
-  if (s.includes("draft")) {
-    return { ...badgeStyle, background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe" };
-  }
-  if (s.includes("scheduled")) {
-    return { ...badgeStyle, background: "#eef2ff", color: "#4338ca", border: "1px solid #c7d2fe" };
-  }
-  if (s.includes("progress")) {
-    return { ...badgeStyle, background: "#ecfeff", color: "#0f766e", border: "1px solid #a5f3fc" };
-  }
-  if (s.includes("complete")) {
-    return { ...badgeStyle, background: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0" };
+    return {
+      display: "inline-flex",
+      alignItems: "center",
+      padding: "8px 14px",
+      borderRadius: "999px",
+      fontSize: "14px",
+      fontWeight: 800,
+      background: "#fef2f2",
+      color: "#c2410c",
+      border: "1px solid #fecaca",
+    };
   }
 
-  return { ...badgeStyle, background: "#f8fafc", color: "#334155", border: "1px solid #e2e8f0" };
+  if (s.includes("draft")) {
+    return {
+      display: "inline-flex",
+      alignItems: "center",
+      padding: "8px 14px",
+      borderRadius: "999px",
+      fontSize: "14px",
+      fontWeight: 800,
+      background: "#eff6ff",
+      color: "#1d4ed8",
+      border: "1px solid #bfdbfe",
+    };
+  }
+
+  if (s.includes("scheduled")) {
+    return {
+      display: "inline-flex",
+      alignItems: "center",
+      padding: "8px 14px",
+      borderRadius: "999px",
+      fontSize: "14px",
+      fontWeight: 800,
+      background: "#eef2ff",
+      color: "#4338ca",
+      border: "1px solid #c7d2fe",
+    };
+  }
+
+  if (s.includes("progress")) {
+    return {
+      display: "inline-flex",
+      alignItems: "center",
+      padding: "8px 14px",
+      borderRadius: "999px",
+      fontSize: "14px",
+      fontWeight: 800,
+      background: "#ecfeff",
+      color: "#0f766e",
+      border: "1px solid #a5f3fc",
+    };
+  }
+
+  if (s.includes("complete")) {
+    return {
+      display: "inline-flex",
+      alignItems: "center",
+      padding: "8px 14px",
+      borderRadius: "999px",
+      fontSize: "14px",
+      fontWeight: 800,
+      background: "#f0fdf4",
+      color: "#166534",
+      border: "1px solid #bbf7d0",
+    };
+  }
+
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "8px 14px",
+    borderRadius: "999px",
+    fontSize: "14px",
+    fontWeight: 800,
+    background: "#f8fafc",
+    color: "#334155",
+    border: "1px solid #e2e8f0",
+  };
 }
 
 function hireChipStyle(confirmed: boolean): React.CSSProperties {
@@ -460,12 +522,11 @@ export default function EventsPage() {
                   </h2>
 
                   <div style={{ marginTop: "10px", color: "#64748b", fontSize: "15px" }}>
-                    Last updated: {new Date().toLocaleDateString()} ,{" "}
-                    {new Date().toLocaleTimeString()}
+                    Imported event record
                   </div>
                 </div>
 
-                <span style={statusBadge(currentStatus)}>{currentStatus}</span>
+                <span style={statusBadgeStyle(currentStatus)}>{currentStatus}</span>
               </div>
 
               <div style={statGrid}>
@@ -568,6 +629,38 @@ export default function EventsPage() {
                 >
                   Delete
                 </button>
+
+                {event.blueprintUrl ? (
+                  <a
+                    href={event.blueprintUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      ...secondaryButton,
+                      textDecoration: "none",
+                      display: "inline-flex",
+                      alignItems: "center",
+                    }}
+                  >
+                    Blueprint
+                  </a>
+                ) : null}
+
+                {event.simFlowUrl ? (
+                  <a
+                    href={event.simFlowUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      ...secondaryButton,
+                      textDecoration: "none",
+                      display: "inline-flex",
+                      alignItems: "center",
+                    }}
+                  >
+                    Sim Flow
+                  </a>
+                ) : null}
               </div>
 
               {(isExpanded || hiresForEvent.length > 0) && (
