@@ -1,48 +1,33 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import { useState } from "react";
+import Link from "next/link";
 import SiteShell from "../../components/SiteShell";
-import * as planningData from "../../lib/planningData";
-import {
-  buildImportedEvents,
-  loadAssignments,
-  saveAssignments,
-  loadSPDirectory,
-  EventAssignment,
-  SPRecord,
-} from "../../lib/cfspData";
+import { events, sps, EventAssignment } from "../../lib/cfspData";
 
 export default function EventDetailPage() {
   const params = useParams();
-  const eventId = String(params?.id || "");
+  const eventId = params?.id as string;
 
-  const events = useMemo(() => buildImportedEvents(planningData), []);
   const event = events.find((e) => e.id === eventId);
 
-  const [directory, setDirectory] = useState<SPRecord[]>([]);
   const [assignments, setAssignments] = useState<EventAssignment[]>([]);
   const [selectedSpId, setSelectedSpId] = useState("");
-
-  useEffect(() => {
-    setDirectory(loadSPDirectory());
-    setAssignments(loadAssignments());
-  }, []);
 
   if (!event) {
     return (
       <SiteShell title="Event Not Found">
-        <div style={{ padding: 20 }}>Event not found</div>
+        <div style={{ padding: 20 }}>
+          <h2>Event not found</h2>
+          <Link href="/events">← Back to Events</Link>
+        </div>
       </SiteShell>
     );
   }
 
-  const eventAssignments = assignments.filter(
-    (a) => a.eventId === event.id
-  );
-
   function addSP() {
-    const sp = directory.find((s) => s.id === selectedSpId);
+    const sp = sps.find((s) => s.id === selectedSpId);
     if (!sp) return;
 
     const newAssign: EventAssignment = {
@@ -51,91 +36,79 @@ export default function EventDetailPage() {
       eventName: event.name,
       spId: sp.id,
       spName: sp.fullName,
-      email: sp.email,
-      phone: sp.phone,
+      spEmail: sp.email,
       confirmed: false,
-      notes: "",
       createdAt: new Date().toISOString(),
     };
 
-    const next = [...assignments, newAssign];
-    setAssignments(next);
-    saveAssignments(next);
-    setSelectedSpId("");
-  }
-
-  function toggleConfirm(id: string) {
-    const next = assignments.map((a) =>
-      a.id === id ? { ...a, confirmed: !a.confirmed } : a
-    );
-    setAssignments(next);
-    saveAssignments(next);
+    setAssignments((prev) => [...prev, newAssign]);
   }
 
   function removeSP(id: string) {
-    const next = assignments.filter((a) => a.id !== id);
-    setAssignments(next);
-    saveAssignments(next);
+    setAssignments((prev) => prev.filter((a) => a.id !== id));
   }
 
-  const emails = eventAssignments.map((a) => a.email).join(";");
-
   function sendEmail() {
-    const subject = `${event.name} - Event Prep`;
+    const emails = assignments.map((a) => a.spEmail).join(",");
 
-    const body = `
+    const subject = encodeURIComponent(
+      `${event.name} – Event Prep (${event.date})`
+    );
+
+    const body = encodeURIComponent(`
 SPs,
 
-Event: ${event.name}
-Date: ${event.dateText}
+Please review the following:
 
-Please be prepared.
+• Event: ${event.name}
+• Date: ${event.date}
+• Time: ${event.time}
+• Location: ${event.location}
 
-Thanks,
+Thank you,
 Cory
-`;
+    `);
 
-    window.location.href =
-      `mailto:?bcc=${emails}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = `mailto:?bcc=${emails}&subject=${subject}&body=${body}`;
   }
 
   return (
     <SiteShell title={event.name}>
       <div style={{ padding: 20 }}>
 
-        <h2>Add SP</h2>
+        <Link href="/events">← Back to Events</Link>
 
+        <h1 style={{ marginTop: 10 }}>{event.name}</h1>
+        <p>{event.date} | {event.time}</p>
+
+        <h3>Add SP</h3>
         <select
           value={selectedSpId}
           onChange={(e) => setSelectedSpId(e.target.value)}
         >
           <option value="">Select SP</option>
-          {directory.map((sp) => (
+          {sps.map((sp) => (
             <option key={sp.id} value={sp.id}>
               {sp.fullName}
             </option>
           ))}
         </select>
 
-        <button onClick={addSP}>Add SP</button>
+        <button onClick={addSP} style={{ marginLeft: 10 }}>
+          Add SP
+        </button>
 
-        <h2 style={{ marginTop: 30 }}>Assigned SPs</h2>
+        <h3 style={{ marginTop: 20 }}>Assigned SPs</h3>
 
-        {eventAssignments.map((a) => (
-          <div key={a.id} style={{ marginBottom: 10 }}>
-            <span
-              onClick={() => toggleConfirm(a.id)}
-              style={{
-                cursor: "pointer",
-                fontWeight: "bold",
-                color: a.confirmed ? "black" : "red",
-                marginRight: 10,
-              }}
+        {assignments.map((a) => (
+          <div key={a.id} style={{ marginBottom: 8 }}>
+            {a.spName} ({a.spEmail})
+            <button
+              onClick={() => removeSP(a.id)}
+              style={{ marginLeft: 10 }}
             >
-              {a.spName}
-            </span>
-
-            <button onClick={() => removeSP(a.id)}>Remove</button>
+              Remove
+            </button>
           </div>
         ))}
 
