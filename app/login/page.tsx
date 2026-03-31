@@ -1,160 +1,318 @@
 "use client";
 
-import { useState } from "react";
-import type { CSSProperties } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import SiteShell from "../components/SiteShell";
 
-const gridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1.1fr 0.9fr",
-  gap: "18px",
-};
-
-const cardStyle: CSSProperties = {
-  background: "rgba(255,255,255,0.94)",
-  borderRadius: "24px",
-  border: "1px solid rgba(23,61,112,0.10)",
+const pageWrap: React.CSSProperties = {
+  maxWidth: "760px",
+  margin: "0 auto",
   padding: "24px",
-  boxShadow: "0 14px 30px rgba(23,61,112,0.08)",
 };
 
-const inputStyle: CSSProperties = {
-  width: "100%",
-  padding: "14px 16px",
-  borderRadius: "14px",
-  border: "1px solid rgba(23,61,112,0.16)",
-  fontSize: "15px",
-  outline: "none",
+const heroCard: React.CSSProperties = {
+  borderRadius: "28px",
+  padding: "28px 30px",
+  marginBottom: "20px",
+  background: "linear-gradient(135deg, #1f4f82 0%, #2d8aa6 55%, #95c85b 100%)",
+  color: "#ffffff",
+  boxShadow: "0 14px 36px rgba(15, 23, 42, 0.12)",
 };
 
-const labelStyle: CSSProperties = {
+const panelCard: React.CSSProperties = {
+  background: "#ffffff",
+  border: "1px solid #dbe4ee",
+  borderRadius: "24px",
+  padding: "24px",
+  boxShadow: "0 10px 26px rgba(15, 23, 42, 0.06)",
+};
+
+const labelStyle: React.CSSProperties = {
+  display: "block",
+  fontSize: "14px",
   fontWeight: 700,
-  color: "#173d70",
+  color: "#1e3a5f",
   marginBottom: "8px",
 };
 
-const buttonRowStyle: CSSProperties = {
-  display: "flex",
-  gap: "12px",
-  flexWrap: "wrap",
-  marginTop: "10px",
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "14px 16px",
+  borderRadius: "14px",
+  border: "1px solid #cfd8e3",
+  outline: "none",
+  fontSize: "16px",
+  color: "#0f172a",
+  background: "#f8fafc",
+  marginBottom: "16px",
+  boxSizing: "border-box",
 };
 
-const primaryButtonStyle: CSSProperties = {
+const primaryButton: React.CSSProperties = {
   border: "none",
   borderRadius: "14px",
   padding: "14px 18px",
-  background: "linear-gradient(135deg, #173d70 0%, #1d8a6a 100%)",
-  color: "#ffffff",
-  fontWeight: 800,
+  fontWeight: 700,
+  fontSize: "15px",
   cursor: "pointer",
+  background: "linear-gradient(135deg, #1f4f82 0%, #0f766e 100%)",
+  color: "#ffffff",
 };
 
-const secondaryButtonStyle: CSSProperties = {
-  border: "1px solid rgba(23,61,112,0.12)",
+const secondaryButton: React.CSSProperties = {
+  border: "1px solid #cbd5e1",
   borderRadius: "14px",
   padding: "14px 18px",
-  background: "#ffffff",
-  color: "#173d70",
-  fontWeight: 800,
+  fontWeight: 700,
+  fontSize: "15px",
   cursor: "pointer",
+  background: "#ffffff",
+  color: "#1e3a5f",
 };
 
-const pillStyle: CSSProperties = {
-  display: "inline-block",
-  padding: "8px 12px",
-  borderRadius: "999px",
-  background: "rgba(23,61,112,0.08)",
-  color: "#173d70",
-  fontSize: "12px",
-  fontWeight: 800,
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
+const noticeStyle: React.CSSProperties = {
+  marginTop: "14px",
+  borderRadius: "14px",
+  padding: "12px 14px",
+  fontSize: "14px",
+  lineHeight: 1.45,
 };
+
+function getSupabaseClient(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
 
 export default function LoginPage() {
-  const [role, setRole] = useState("Admin");
-  const [username, setUsername] = useState("");
+  const router = useRouter();
+  const supabase = useMemo(() => getSupabaseClient(), []);
+
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [errorText, setErrorText] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function checkSession() {
+      if (!supabase) return;
+      const { data } = await supabase.auth.getSession();
+      if (!isMounted) return;
+
+      if (data.session) {
+        router.replace("/me");
+      }
+    }
+
+    checkSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router, supabase]);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setLoading(true);
+    setMessage("");
+    setErrorText("");
+
+    try {
+      if (!supabase) {
+        setErrorText(
+          "Supabase environment variables are missing. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel and your local .env.local."
+        );
+        return;
+      }
+
+      if (!email.trim() || !password.trim()) {
+        setErrorText("Enter both email and password.");
+        return;
+      }
+
+      if (mode === "signin") {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+
+        if (error) {
+          setErrorText(error.message);
+          return;
+        }
+
+        setMessage("Login successful. Taking you to your profile...");
+        router.push("/me");
+        router.refresh();
+      } else {
+        const { error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+        });
+
+        if (error) {
+          setErrorText(error.message);
+          return;
+        }
+
+        setMessage(
+          "Account created. If email confirmation is enabled in Supabase, confirm your email first. Otherwise you can sign in now."
+        );
+        setMode("signin");
+      }
+    } catch (err) {
+      setErrorText(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <SiteShell
-      title="Login"
-      subtitle="Use this as the stable entry point for Admin, Sim Op, and SP access while auth wiring continues."
-    >
-      <div style={gridStyle}>
-        <div style={cardStyle}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            <div style={pillStyle}>Access Control</div>
-            <div style={{ fontSize: "28px", fontWeight: 800, color: "#173d70" }}>
-              Welcome back to CFSP
-            </div>
-            <div style={{ color: "#597391", lineHeight: 1.6 }}>
-              This page is now a true route and real UI layer. You can wire Supabase auth into
-              this next, but the app routing and page structure no longer depends on a broken
-              fake landing page.
-            </div>
-
-            <div>
-              <div style={labelStyle}>Role</div>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                style={inputStyle}
-              >
-                <option>Admin</option>
-                <option>Sim Op</option>
-                <option>SP</option>
-              </select>
-            </div>
-
-            <div>
-              <div style={labelStyle}>Username / Email</div>
-              <input
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter username or email"
-                style={inputStyle}
-              />
-            </div>
-
-            <div>
-              <div style={labelStyle}>Password</div>
-              <input
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                type="password"
-                placeholder="Enter password"
-                style={inputStyle}
-              />
-            </div>
-
-            <div style={buttonRowStyle}>
-              <button style={primaryButtonStyle} type="button">
-                Sign In
-              </button>
-              <button style={secondaryButtonStyle} type="button">
-                Use Test Login
-              </button>
-            </div>
-          </div>
+    <SiteShell>
+      <div style={pageWrap}>
+        <div style={heroCard}>
+          <h1 style={{ margin: 0, fontSize: "46px", lineHeight: 1.05 }}>Login</h1>
+          <p style={{ margin: "12px 0 0 0", fontSize: "20px", opacity: 0.96 }}>
+            Personal sign-in for your profile, your events, and future role-based access.
+          </p>
         </div>
 
-        <div style={cardStyle}>
-          <div style={{ fontSize: "22px", fontWeight: 800, color: "#173d70", marginBottom: "12px" }}>
-            Role behavior
+        <div style={panelCard}>
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              marginBottom: "20px",
+              flexWrap: "wrap",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setMode("signin");
+                setMessage("");
+                setErrorText("");
+              }}
+              style={{
+                ...secondaryButton,
+                background: mode === "signin" ? "#0f766e" : "#ffffff",
+                color: mode === "signin" ? "#ffffff" : "#1e3a5f",
+                borderColor: mode === "signin" ? "#0f766e" : "#cbd5e1",
+              }}
+            >
+              Sign In
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setMode("signup");
+                setMessage("");
+                setErrorText("");
+              }}
+              style={{
+                ...secondaryButton,
+                background: mode === "signup" ? "#1f4f82" : "#ffffff",
+                color: mode === "signup" ? "#ffffff" : "#1e3a5f",
+                borderColor: mode === "signup" ? "#1f4f82" : "#cbd5e1",
+              }}
+            >
+              Create Account
+            </button>
           </div>
-          <div style={{ color: "#597391", lineHeight: 1.7 }}>
-            <strong>Admin:</strong> full visibility across intake, events, assignments, SP directory,
-            blueprints, emails, and future reporting.
-            <br />
-            <br />
-            <strong>Sim Op:</strong> sees assigned and relevant event operations, staffing, timing,
-            and prep tools.
-            <br />
-            <br />
-            <strong>SP:</strong> sees profile, assignments, event prep, and future self-service
-            updates.
+
+          <form onSubmit={handleSubmit}>
+            <label style={labelStyle}>Email</label>
+            <input
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@drexel.edu"
+              style={inputStyle}
+            />
+
+            <label style={labelStyle}>Password</label>
+            <input
+              type="password"
+              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter password"
+              style={inputStyle}
+            />
+
+            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "6px" }}>
+              <button type="submit" disabled={loading} style={primaryButton}>
+                {loading
+                  ? mode === "signin"
+                    ? "Signing in..."
+                    : "Creating account..."
+                  : mode === "signin"
+                  ? "Sign In"
+                  : "Create Account"}
+              </button>
+
+              <Link
+                href="/me"
+                style={{
+                  ...secondaryButton,
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                }}
+              >
+                Go to My Profile
+              </Link>
+            </div>
+          </form>
+
+          {message ? (
+            <div
+              style={{
+                ...noticeStyle,
+                background: "#ecfdf5",
+                color: "#166534",
+                border: "1px solid #bbf7d0",
+              }}
+            >
+              {message}
+            </div>
+          ) : null}
+
+          {errorText ? (
+            <div
+              style={{
+                ...noticeStyle,
+                background: "#fef2f2",
+                color: "#991b1b",
+                border: "1px solid #fecaca",
+              }}
+            >
+              {errorText}
+            </div>
+          ) : null}
+
+          <div
+            style={{
+              marginTop: "18px",
+              paddingTop: "18px",
+              borderTop: "1px solid #e2e8f0",
+              color: "#475569",
+              fontSize: "14px",
+              lineHeight: 1.5,
+            }}
+          >
+            Use a real Supabase Auth account here. After sign-in, <strong>/me</strong> becomes your
+            personal page and starts filtering events to you.
           </div>
         </div>
       </div>
