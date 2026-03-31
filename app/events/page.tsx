@@ -2,643 +2,630 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import type { CSSProperties } from "react";
-import {
-  EventRecord,
-  formatIsoDateShort,
-  getEventDateLabel,
-  getEventLeads,
-  getEventRooms,
-  getEventSimOps,
-  getSortedEvents,
-} from "../lib/planningData";
-import { AssignmentDraft, getStoredAssignments } from "../lib/mockData";
+import SiteShell from "../components/SiteShell";
+import * as planningData from "../lib/planningData";
 
-type EventStatus =
-  | "Needs SPs"
-  | "Draft"
-  | "Scheduled"
-  | "In Progress"
-  | "Completed"
-  | "Canceled"
-  | string;
+type AnyRecord = Record<string, any>;
 
-const STORAGE_KEY = "cfsp_events_v1";
-
-const colors = {
-  white: "#ffffff",
-  navy: "#12376b",
-  blue: "#1E5AA8",
-  green: "#2E8B57",
-  border: "#d4deeb",
-  muted: "#61748e",
-  red: "#c84a3a",
-  redSoft: "#fbefec",
-  greenSoft: "#edf8f1",
-  blueSoft: "#edf4ff",
-  graySoft: "#eef2f7",
+type EventRecord = {
+  id: string;
+  name: string;
+  status: string;
+  dateText: string;
+  sessionCount: number;
+  roomCount: number;
+  roomsLabel: string;
+  simOpsLabel: string;
+  leadsLabel: string;
+  spNeeded: number;
+  raw: AnyRecord;
 };
 
-const statuses: EventStatus[] = [
-  "Draft",
-  "Needs SPs",
-  "Scheduled",
-  "In Progress",
-  "Completed",
-  "Canceled",
-];
+type EventHire = {
+  id: string;
+  eventId: string;
+  spName: string;
+  confirmed: boolean;
+  createdAt: string;
+};
 
-function saveEvents(events: EventRecord[]) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+const STORAGE_KEY = "cfsp-event-sp-hires-v1";
+
+const pageWrap: React.CSSProperties = {
+  maxWidth: "1280px",
+  margin: "0 auto",
+  padding: "20px",
+};
+
+const heroCard: React.CSSProperties = {
+  borderRadius: "28px",
+  padding: "28px 30px",
+  marginBottom: "20px",
+  background: "linear-gradient(135deg, #1f4f82 0%, #2d8aa6 55%, #95c85b 100%)",
+  color: "#ffffff",
+  boxShadow: "0 14px 36px rgba(15, 23, 42, 0.12)",
+};
+
+const cardStyle: React.CSSProperties = {
+  background: "#ffffff",
+  border: "1px solid #dbe4ee",
+  borderRadius: "28px",
+  padding: "24px",
+  boxShadow: "0 10px 28px rgba(15, 23, 42, 0.05)",
+  marginBottom: "22px",
+};
+
+const statGrid: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gap: "14px",
+  marginBottom: "18px",
+};
+
+const statCard: React.CSSProperties = {
+  border: "1px solid #dbe4ee",
+  borderRadius: "18px",
+  padding: "14px 16px",
+  background: "#f8fbff",
+};
+
+const statLabel: React.CSSProperties = {
+  fontSize: "13px",
+  fontWeight: 700,
+  color: "#64748b",
+  marginBottom: "6px",
+};
+
+const statValue: React.CSSProperties = {
+  fontSize: "18px",
+  fontWeight: 800,
+  color: "#173b6c",
+};
+
+const buttonRow: React.CSSProperties = {
+  display: "flex",
+  gap: "12px",
+  flexWrap: "wrap",
+  alignItems: "center",
+  marginTop: "14px",
+};
+
+const primaryButton: React.CSSProperties = {
+  border: "none",
+  borderRadius: "14px",
+  padding: "13px 18px",
+  fontWeight: 700,
+  fontSize: "15px",
+  cursor: "pointer",
+  background: "#1f5fbf",
+  color: "#ffffff",
+};
+
+const secondaryButton: React.CSSProperties = {
+  border: "1px solid #cfd8e3",
+  borderRadius: "14px",
+  padding: "13px 18px",
+  fontWeight: 700,
+  fontSize: "15px",
+  cursor: "pointer",
+  background: "#ffffff",
+  color: "#173b6c",
+};
+
+const dangerButton: React.CSSProperties = {
+  border: "1px solid #cfd8e3",
+  borderRadius: "14px",
+  padding: "13px 18px",
+  fontWeight: 700,
+  fontSize: "15px",
+  cursor: "pointer",
+  background: "#eef2f7",
+  color: "#173b6c",
+};
+
+const badgeStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  padding: "8px 14px",
+  borderRadius: "999px",
+  fontSize: "14px",
+  fontWeight: 800,
+};
+
+const hiresWrap: React.CSSProperties = {
+  marginTop: "16px",
+  padding: "16px",
+  borderRadius: "18px",
+  background: "#f8fafc",
+  border: "1px solid #e2e8f0",
+};
+
+const chipRow: React.CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  marginTop: "10px",
+};
+
+const sectionLabel: React.CSSProperties = {
+  fontSize: "15px",
+  fontWeight: 800,
+  color: "#173b6c",
+};
+
+function safeString(value: any): string {
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
 }
 
-function normalizeText(value: string | undefined) {
-  return String(value || "")
-    .trim()
+function toNumber(value: any): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function slugify(value: string): string {
+  return safeString(value)
     .toLowerCase()
-    .replace(/\s+/g, " ");
+    .replace(/%20/g, " ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
-function getAssignedCountForEvent(event: EventRecord, assignments: AssignmentDraft[]) {
-  const seen = new Set<string>();
+function extractAllRows(moduleLike: AnyRecord): AnyRecord[] {
+  const rows: AnyRecord[] = [];
 
-  assignments.forEach((assignment) => {
-    const matchesById =
-      assignment.eventMode === "existing" &&
-      assignment.eventId &&
-      assignment.eventId === event.id;
-
-    const matchesByFallbackName =
-      normalizeText(assignment.eventName) === normalizeText(event.name) &&
-      normalizeText(assignment.dateText) === normalizeText(getEventDateLabel(event));
-
-    if (matchesById || matchesByFallbackName) {
-      seen.add(assignment.spId);
+  Object.values(moduleLike).forEach((value) => {
+    if (Array.isArray(value)) {
+      value.forEach((row) => {
+        if (row && typeof row === "object") rows.push(row);
+      });
     }
   });
 
-  return seen.size;
+  return rows;
 }
 
-function getStatusPillStyle(status: EventStatus): React.CSSProperties {
-  switch (status) {
-    case "Needs SPs":
-      return {
-        background: colors.redSoft,
-        color: colors.red,
-        border: "1px solid #f1c9c2",
-      };
-    case "Scheduled":
-      return {
-        background: colors.greenSoft,
-        color: "#256b45",
-        border: "1px solid #c9e5d3",
-      };
-    case "In Progress":
-      return {
-        background: "#fff6e8",
-        color: "#b97814",
-        border: "1px solid #f1ddb3",
-      };
-    case "Completed":
-      return {
-        background: colors.blueSoft,
-        color: "#163a70",
-        border: "1px solid #cfe0f6",
-      };
-    case "Canceled":
-      return {
-        background: colors.graySoft,
-        color: colors.muted,
-        border: `1px solid ${colors.border}`,
-      };
-    default:
-      return {
-        background: colors.graySoft,
-        color: colors.navy,
-        border: `1px solid ${colors.border}`,
-      };
-  }
-}
+function buildEvents(rows: AnyRecord[]): EventRecord[] {
+  const rawEvents = rows.filter((row) => {
+    const maybeName =
+      safeString(row.name) ||
+      safeString(row.title) ||
+      safeString(row.event_name) ||
+      safeString(row.eventName);
+    return Boolean(maybeName);
+  });
 
-export default function EventsPage() {
-  const [events, setEvents] = useState<EventRecord[]>([]);
-  const [assignments, setAssignments] = useState<AssignmentDraft[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  const [query, setQuery] = useState("");
-  const [expandedIds, setExpandedIds] = useState<string[]>([]);
+  const mapped = rawEvents.map((row) => {
+    const name =
+      safeString(row.name) ||
+      safeString(row.title) ||
+      safeString(row.event_name) ||
+      safeString(row.eventName) ||
+      "Untitled Event";
 
-  useEffect(() => {
-    const nextEvents = getSortedEvents().map((event) => ({
-      ...event,
-      status: event.status || "Draft",
-    }));
-    setEvents(nextEvents);
-    setAssignments(getStoredAssignments());
-    setLoaded(true);
-  }, []);
+    const id =
+      safeString(row.id) ||
+      safeString(row.event_id) ||
+      safeString(row.eventId) ||
+      slugify(name);
 
-  useEffect(() => {
-    function refreshAssignments() {
-      setAssignments(getStoredAssignments());
-    }
+    const dates =
+      safeString(row.date_text) ||
+      safeString(row.dateText) ||
+      safeString(row.event_date) ||
+      safeString(row.eventDate) ||
+      safeString(row.date) ||
+      "No date listed";
 
-    window.addEventListener("cfsp-assignments-updated", refreshAssignments);
-    window.addEventListener("storage", refreshAssignments);
+    const sessionCount =
+      toNumber(row.session_count) ||
+      toNumber(row.sessionCount) ||
+      toNumber(row.sessions) ||
+      0;
 
-    return () => {
-      window.removeEventListener("cfsp-assignments-updated", refreshAssignments);
-      window.removeEventListener("storage", refreshAssignments);
+    const roomCount =
+      toNumber(row.room_count) ||
+      toNumber(row.roomCount) ||
+      toNumber(row.rooms_count) ||
+      0;
+
+    const roomsLabel =
+      safeString(row.rooms_label) ||
+      safeString(row.roomsLabel) ||
+      safeString(row.rooms) ||
+      safeString(row.location) ||
+      safeString(row.room) ||
+      "—";
+
+    const simOpsLabel =
+      safeString(row.sim_ops) ||
+      safeString(row.simOps) ||
+      safeString(row.assigned_staff) ||
+      safeString(row.staff) ||
+      safeString(row.sim_op) ||
+      safeString(row.simOp) ||
+      "—";
+
+    const leadsLabel =
+      safeString(row.leads) ||
+      safeString(row.lead) ||
+      safeString(row.faculty) ||
+      safeString(row.faculty_contact) ||
+      "—";
+
+    return {
+      id,
+      name,
+      status:
+        safeString(row.status) ||
+        safeString(row.event_status) ||
+        safeString(row.eventStatus) ||
+        "Draft",
+      dateText: dates,
+      sessionCount,
+      roomCount,
+      roomsLabel,
+      simOpsLabel,
+      leadsLabel,
+      spNeeded:
+        toNumber(row.sp_needed) ||
+        toNumber(row.spNeeded) ||
+        toNumber(row.needed) ||
+        0,
+      raw: row,
     };
-  }, []);
+  });
 
-  useEffect(() => {
-    if (!loaded) return;
-    saveEvents(events);
-  }, [events, loaded]);
-
-  function toggleExpanded(id: string) {
-    setExpandedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
-  }
-
-  function updateEventStatus(id: string, status: EventStatus) {
-    setEvents((prev) =>
-      prev.map((event) =>
-        event.id === id
-          ? {
-              ...event,
-              status,
-              updated_at: new Date().toISOString(),
-            }
-          : event
-      )
-    );
-  }
-
-  function handleDelete(id: string) {
-    setEvents((prev) => prev.filter((event) => event.id !== id));
-    setExpandedIds((prev) => prev.filter((item) => item !== id));
-  }
-
-  const filteredEvents = useMemo(() => {
-    const q = query.trim().toLowerCase();
-
-    const base = events.filter((event) => {
-      const simOps = getEventSimOps(event).join(" ").toLowerCase();
-      const rooms = getEventRooms(event).join(" ").toLowerCase();
-      const leads = getEventLeads(event).join(" ").toLowerCase();
-      const dates = getEventDateLabel(event).toLowerCase();
-
-      if (!q) return true;
-
-      return (
-        event.name.toLowerCase().includes(q) ||
-        String(event.status || "").toLowerCase().includes(q) ||
-        dates.includes(q) ||
-        simOps.includes(q) ||
-        rooms.includes(q) ||
-        leads.includes(q)
-      );
-    });
-
-    return [...base].sort((a, b) => {
-      const aDate =
-        (a.sessions || [])
-          .map((session) => String(session.date || ""))
-          .filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date))
-          .sort()[0] || "9999-12-31";
-
-      const bDate =
-        (b.sessions || [])
-          .map((session) => String(session.date || ""))
-          .filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date))
-          .sort()[0] || "9999-12-31";
-
-      if (aDate !== bDate) return aDate.localeCompare(bDate);
-      return a.name.localeCompare(b.name);
-    });
-  }, [events, query]);
-
-  const summary = useMemo(() => {
-    const total = events.length;
-    const drafts = events.filter((event) => event.status === "Draft").length;
-
-    const needsSPs = events.filter((event) => {
-      const assigned = getAssignedCountForEvent(event, assignments);
-      const needed = Number(event.sp_needed || 0);
-      return needed > assigned;
-    }).length;
-
-    const scheduled = events.filter((event) => event.status === "Scheduled").length;
-
-    return { total, drafts, needsSPs, scheduled };
-  }, [events, assignments]);
-
-  return (
-    <div style={{ display: "grid", gap: 24 }}>
-      <section
-        style={{
-          background: colors.white,
-          border: `1px solid ${colors.border}`,
-          borderRadius: 28,
-          padding: 28,
-          boxShadow: "0 12px 28px rgba(18,55,107,0.07)",
-          display: "grid",
-          gap: 18,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 16,
-            alignItems: "flex-start",
-            flexWrap: "wrap",
-          }}
-        >
-          <div>
-            <div style={{ fontSize: 40, fontWeight: 900, color: colors.navy }}>Events</div>
-            <div style={{ fontSize: 17, color: colors.muted, marginTop: 10 }}>
-              Imported schedule events, expandable details, and cleaner organization.
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <Link href="/" style={navBtn}>
-              Home
-            </Link>
-            <Link href="/dashboard" style={navBtn}>
-              Dashboard
-            </Link>
-            <Link href="/sp-directory" style={navBtn}>
-              SP Directory
-            </Link>
-            <Link href="/upload-schedule" style={greenBtn}>
-              Upload Schedule
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: 18,
-        }}
-      >
-        {[
-          { label: "Total Events", value: summary.total, color: colors.blue },
-          { label: "Drafts", value: summary.drafts, color: colors.muted },
-          { label: "Need SPs", value: summary.needsSPs, color: colors.red },
-          { label: "Scheduled", value: summary.scheduled, color: colors.green },
-        ].map((item) => (
-          <div
-            key={item.label}
-            style={{
-              background: colors.white,
-              border: `1px solid ${colors.border}`,
-              borderRadius: 22,
-              padding: 22,
-              boxShadow: "0 12px 28px rgba(18,55,107,0.07)",
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: 8,
-                background: item.color,
-              }}
-            />
-            <div style={{ fontSize: 14, fontWeight: 800, color: colors.muted }}>{item.label}</div>
-            <div style={{ fontSize: 42, fontWeight: 900, color: colors.navy, marginTop: 10 }}>
-              {item.value}
-            </div>
-          </div>
-        ))}
-      </section>
-
-      <section
-        style={{
-          background: colors.white,
-          border: `1px solid ${colors.border}`,
-          borderRadius: 30,
-          padding: 22,
-          display: "grid",
-          gap: 18,
-          boxShadow: "0 12px 28px rgba(18,55,107,0.07)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 12,
-            alignItems: "center",
-            flexWrap: "wrap",
-          }}
-        >
-          <div style={{ fontSize: 24, fontWeight: 900, color: colors.navy }}>All Events</div>
-
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by event, room, Sim Op, lead..."
-            style={{
-              width: 380,
-              maxWidth: "100%",
-              height: 50,
-              borderRadius: 14,
-              border: `1px solid ${colors.border}`,
-              padding: "0 14px",
-              fontSize: 15,
-              color: colors.navy,
-              background: "#fff",
-            }}
-          />
-        </div>
-
-        {filteredEvents.length === 0 ? (
-          <div
-            style={{
-              border: `1px dashed ${colors.border}`,
-              borderRadius: 18,
-              padding: 32,
-              textAlign: "center",
-              color: colors.muted,
-              fontSize: 15,
-            }}
-          >
-            No events found.
-          </div>
-        ) : (
-          filteredEvents.map((event) => {
-            const isExpanded = expandedIds.includes(event.id);
-            const rooms = getEventRooms(event);
-            const simOps = getEventSimOps(event);
-            const leads = getEventLeads(event);
-            const sessions = event.sessions || [];
-            const assignedCount = getAssignedCountForEvent(event, assignments);
-            const neededCount = Number(event.sp_needed || 0);
-
-            return (
-              <div
-                key={event.id}
-                style={{
-                  background: "#fff",
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: 24,
-                  padding: 22,
-                  display: "grid",
-                  gap: 18,
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 12,
-                    alignItems: "flex-start",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 30, fontWeight: 900, color: colors.navy }}>
-                      {event.name}
-                    </div>
-                    <div style={{ fontSize: 14, color: colors.muted, marginTop: 8 }}>
-                      Last updated: {new Date(event.updated_at).toLocaleString()}
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      borderRadius: 999,
-                      padding: "9px 13px",
-                      fontWeight: 800,
-                      fontSize: 13,
-                      ...getStatusPillStyle(event.status),
-                    }}
-                  >
-                    {event.status}
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                    gap: 14,
-                  }}
-                >
-                  {[
-                    { label: "Dates", value: getEventDateLabel(event) },
-                    { label: "Sessions", value: sessions.length },
-                    { label: "Rooms", value: rooms.length },
-                    { label: "SP Coverage", value: `${assignedCount} / ${neededCount}` },
-                  ].map((item) => (
-                    <div
-                      key={item.label}
-                      style={{
-                        background: "#f8fbff",
-                        border: "1px solid #e4edf7",
-                        borderRadius: 16,
-                        padding: 16,
-                      }}
-                    >
-                      <div style={{ fontSize: 12, fontWeight: 800, color: colors.muted }}>
-                        {item.label}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 18,
-                          fontWeight: 900,
-                          color: colors.navy,
-                          marginTop: 8,
-                        }}
-                      >
-                        {item.value}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div style={{ display: "grid", gap: 8, color: colors.navy, fontSize: 16 }}>
-                  <div>
-                    <strong>Assigned Sim Ops:</strong> {simOps.length ? simOps.join(", ") : "None shown"}
-                  </div>
-                  <div>
-                    <strong>Lead(s):</strong> {leads.length ? leads.join(", ") : "None shown"}
-                  </div>
-                  <div>
-                    <strong>Rooms:</strong> {rooms.length ? rooms.join(", ") : "None shown"}
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                  <button onClick={() => toggleExpanded(event.id)} style={blueBtn}>
-                    {isExpanded ? "Hide Details" : "Expand"}
-                  </button>
-
-                  <Link href={`/events/${encodeURIComponent(event.id)}`} style={whiteBtn}>
-                    View
-                  </Link>
-
-                  <select
-                    value={event.status}
-                    onChange={(e) => updateEventStatus(event.id, e.target.value as EventStatus)}
-                    style={{
-                      height: 46,
-                      borderRadius: 14,
-                      border: `1px solid ${colors.border}`,
-                      padding: "0 12px",
-                      fontSize: 14,
-                      color: colors.navy,
-                      background: "#fff",
-                    }}
-                  >
-                    {statuses.map((status) => (
-                      <option key={status} value={status}>
-                        {status}
-                      </option>
-                    ))}
-                  </select>
-
-                  <button onClick={() => handleDelete(event.id)} style={softBtn}>
-                    Delete
-                  </button>
-                </div>
-
-                {isExpanded ? (
-                  <div
-                    style={{
-                      borderTop: `1px solid ${colors.border}`,
-                      paddingTop: 16,
-                      display: "grid",
-                      gap: 12,
-                    }}
-                  >
-                    <div style={{ fontSize: 20, fontWeight: 900, color: colors.navy }}>
-                      Session Schedule
-                    </div>
-
-                    <div
-                      style={{
-                        overflowX: "auto",
-                        border: `1px solid ${colors.border}`,
-                        borderRadius: 16,
-                      }}
-                    >
-                      <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff" }}>
-                        <thead>
-                          <tr>
-                            {["Date", "Start", "End", "Room", "Lead", "Assigned"].map((label) => (
-                              <th
-                                key={label}
-                                style={{
-                                  textAlign: "left",
-                                  padding: "14px 12px",
-                                  background: "#f8fbff",
-                                  borderBottom: `1px solid ${colors.border}`,
-                                  fontSize: 13,
-                                  color: colors.muted,
-                                }}
-                              >
-                                {label}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sessions.map((session, index) => (
-                            <tr key={session.id || `${event.id}-${index}`}>
-                              <td style={td}>{formatIsoDateShort(session.date)}</td>
-                              <td style={td}>{session.startTime || "TBD"}</td>
-                              <td style={td}>{session.endTime || "TBD"}</td>
-                              <td style={td}>{session.room || session.roomRaw || "TBD"}</td>
-                              <td style={td}>{session.lead || "—"}</td>
-                              <td style={td}>
-                                {(session.employees || []).length
-                                  ? (session.employees || []).join(", ")
-                                  : "—"}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            );
-          })
-        )}
-      </section>
-    </div>
+  return mapped.filter(
+    (event, index, arr) =>
+      arr.findIndex(
+        (x) =>
+          slugify(x.id) === slugify(event.id) ||
+          (slugify(x.name) === slugify(event.name) && x.dateText === event.dateText)
+      ) === index
   );
 }
 
-const navBtn: React.CSSProperties = {
-  textDecoration: "none",
-  background: "#ffffff",
-  color: "#12376b",
-  border: "1px solid #d4deeb",
-  borderRadius: 14,
-  padding: "12px 18px",
-  fontWeight: 900,
-};
+function loadSavedHires(): EventHire[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
-const blueBtn: React.CSSProperties = {
-  background: "#1E5AA8",
-  color: "#fff",
-  border: "none",
-  borderRadius: 14,
-  padding: "12px 18px",
-  fontWeight: 900,
-  cursor: "pointer",
-};
+function saveHires(hires: EventHire[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(hires));
+}
 
-const greenBtn: React.CSSProperties = {
-  textDecoration: "none",
-  background: "#2E8B57",
-  color: "#fff",
-  borderRadius: 14,
-  padding: "12px 18px",
-  fontWeight: 900,
-};
+function statusBadge(status: string): React.CSSProperties {
+  const s = status.toLowerCase();
 
-const whiteBtn: React.CSSProperties = {
-  textDecoration: "none",
-  background: "#ffffff",
-  color: "#12376b",
-  border: "1px solid #d4deeb",
-  borderRadius: 14,
-  padding: "12px 18px",
-  fontWeight: 900,
-};
+  if (s.includes("need")) {
+    return { ...badgeStyle, background: "#fef2f2", color: "#c2410c", border: "1px solid #fecaca" };
+  }
+  if (s.includes("draft")) {
+    return { ...badgeStyle, background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe" };
+  }
+  if (s.includes("scheduled")) {
+    return { ...badgeStyle, background: "#eef2ff", color: "#4338ca", border: "1px solid #c7d2fe" };
+  }
+  if (s.includes("progress")) {
+    return { ...badgeStyle, background: "#ecfeff", color: "#0f766e", border: "1px solid #a5f3fc" };
+  }
+  if (s.includes("complete")) {
+    return { ...badgeStyle, background: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0" };
+  }
 
-const softBtn: React.CSSProperties = {
-  background: "#eef2f7",
-  color: "#12376b",
-  border: "1px solid #d4deeb",
-  borderRadius: 14,
-  padding: "12px 18px",
-  fontWeight: 900,
-  cursor: "pointer",
-};
+  return { ...badgeStyle, background: "#f8fafc", color: "#334155", border: "1px solid #e2e8f0" };
+}
 
-const td: React.CSSProperties = {
-  padding: "12px 10px",
-  borderBottom: "1px solid #eef2f7",
-  fontSize: 14,
-  color: "#12376b",
-  verticalAlign: "top",
-};
+function hireChipStyle(confirmed: boolean): React.CSSProperties {
+  if (confirmed) {
+    return {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: "8px",
+      padding: "9px 12px",
+      borderRadius: "999px",
+      border: "1px solid #111111",
+      background: "#ffffff",
+      color: "#111111",
+      fontWeight: 800,
+      fontSize: "14px",
+    };
+  }
+
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+    padding: "9px 12px",
+    borderRadius: "999px",
+    border: "1px solid #dc2626",
+    background: "#fff1f2",
+    color: "#dc2626",
+    fontWeight: 800,
+    fontSize: "14px",
+  };
+}
+
+export default function EventsPage() {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [eventStatuses, setEventStatuses] = useState<Record<string, string>>({});
+  const [deleted, setDeleted] = useState<Record<string, boolean>>({});
+  const [savedHires, setSavedHires] = useState<EventHire[]>([]);
+
+  const events = useMemo(() => {
+    const rows = extractAllRows(planningData as AnyRecord);
+    return buildEvents(rows);
+  }, []);
+
+  useEffect(() => {
+    setSavedHires(loadSavedHires());
+  }, []);
+
+  function toggleExpanded(eventId: string) {
+    setExpanded((prev) => ({
+      ...prev,
+      [eventId]: !prev[eventId],
+    }));
+  }
+
+  function handleDelete(eventId: string) {
+    const ok = window.confirm("Delete this event card from view?");
+    if (!ok) return;
+
+    setDeleted((prev) => ({
+      ...prev,
+      [eventId]: true,
+    }));
+  }
+
+  function handleAddSP(eventId: string) {
+    const spName = window.prompt("Enter the SP name:");
+    if (!spName || !spName.trim()) return;
+
+    const confirmed = window.confirm(
+      "Click OK for CONFIRMED HIRE.\nClick Cancel for NOT CONFIRMED."
+    );
+
+    const newHire: EventHire = {
+      id: `${eventId}-${Date.now()}`,
+      eventId,
+      spName: spName.trim(),
+      confirmed,
+      createdAt: new Date().toISOString(),
+    };
+
+    const next = [...savedHires, newHire];
+    setSavedHires(next);
+    saveHires(next);
+  }
+
+  function handleRemoveSP(hireId: string) {
+    const next = savedHires.filter((hire) => hire.id !== hireId);
+    setSavedHires(next);
+    saveHires(next);
+  }
+
+  const visibleEvents = events.filter((event) => !deleted[event.id]);
+
+  return (
+    <SiteShell>
+      <div style={pageWrap}>
+        <div style={heroCard}>
+          <h1 style={{ margin: 0, fontSize: "46px", lineHeight: 1.02 }}>Events</h1>
+          <p style={{ margin: "12px 0 0 0", fontSize: "20px", opacity: 0.96 }}>
+            Event control center with quick staffing, coverage view, and direct SP adds.
+          </p>
+        </div>
+
+        {visibleEvents.map((event) => {
+          const currentStatus = eventStatuses[event.id] || event.status;
+          const hiresForEvent = savedHires.filter((hire) => hire.eventId === event.id);
+          const confirmedCount = hiresForEvent.filter((hire) => hire.confirmed).length;
+          const totalCount = hiresForEvent.length;
+          const spNeeded = event.spNeeded || 0;
+          const coverageDisplay = `${totalCount} / ${spNeeded}`;
+          const isExpanded = !!expanded[event.id];
+
+          return (
+            <div key={event.id} style={cardStyle}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: "16px",
+                  alignItems: "flex-start",
+                  flexWrap: "wrap",
+                  marginBottom: "10px",
+                }}
+              >
+                <div>
+                  <h2
+                    style={{
+                      margin: 0,
+                      fontSize: "34px",
+                      lineHeight: 1.08,
+                      color: "#173b6c",
+                    }}
+                  >
+                    {event.name}
+                  </h2>
+
+                  <div style={{ marginTop: "10px", color: "#64748b", fontSize: "15px" }}>
+                    Last updated: {new Date().toLocaleDateString()} ,{" "}
+                    {new Date().toLocaleTimeString()}
+                  </div>
+                </div>
+
+                <span style={statusBadge(currentStatus)}>{currentStatus}</span>
+              </div>
+
+              <div style={statGrid}>
+                <div style={statCard}>
+                  <div style={statLabel}>Dates</div>
+                  <div style={statValue}>{event.dateText || "—"}</div>
+                </div>
+
+                <div style={statCard}>
+                  <div style={statLabel}>Sessions</div>
+                  <div style={statValue}>{event.sessionCount}</div>
+                </div>
+
+                <div style={statCard}>
+                  <div style={statLabel}>Rooms</div>
+                  <div style={statValue}>{event.roomCount}</div>
+                </div>
+
+                <div style={statCard}>
+                  <div style={statLabel}>SP Coverage</div>
+                  <div style={statValue}>{coverageDisplay}</div>
+                </div>
+              </div>
+
+              <div style={{ color: "#173b6c", fontSize: "16px", lineHeight: 1.7 }}>
+                <div>
+                  <strong>Assigned Sim Ops:</strong> {event.simOpsLabel || "—"}
+                </div>
+                <div>
+                  <strong>Lead(s):</strong> {event.leadsLabel || "—"}
+                </div>
+                <div>
+                  <strong>Rooms:</strong> {event.roomsLabel || "—"}
+                </div>
+              </div>
+
+              <div style={buttonRow}>
+                <button
+                  type="button"
+                  onClick={() => toggleExpanded(event.id)}
+                  style={primaryButton}
+                >
+                  {isExpanded ? "Collapse" : "Expand"}
+                </button>
+
+                <Link
+                  href={`/events/${event.id}`}
+                  style={{
+                    ...secondaryButton,
+                    textDecoration: "none",
+                    display: "inline-flex",
+                    alignItems: "center",
+                  }}
+                >
+                  View
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={() => handleAddSP(event.id)}
+                  style={{
+                    ...secondaryButton,
+                    border: "1px solid #1f5fbf",
+                    color: "#1f5fbf",
+                    fontWeight: 800,
+                  }}
+                >
+                  Add SP
+                </button>
+
+                <select
+                  value={currentStatus}
+                  onChange={(e) =>
+                    setEventStatuses((prev) => ({
+                      ...prev,
+                      [event.id]: e.target.value,
+                    }))
+                  }
+                  style={{
+                    borderRadius: "14px",
+                    border: "1px solid #cfd8e3",
+                    padding: "13px 16px",
+                    fontWeight: 700,
+                    fontSize: "15px",
+                    color: "#173b6c",
+                    background: "#ffffff",
+                  }}
+                >
+                  <option value="Draft">Draft</option>
+                  <option value="Needs SPs">Needs SPs</option>
+                  <option value="Scheduled">Scheduled</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Complete">Complete</option>
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => handleDelete(event.id)}
+                  style={dangerButton}
+                >
+                  Delete
+                </button>
+              </div>
+
+              {(isExpanded || hiresForEvent.length > 0) && (
+                <div style={hiresWrap}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: "12px",
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div style={sectionLabel}>SP Hires / Assignments</div>
+                    <div style={{ color: "#475569", fontSize: "14px", fontWeight: 700 }}>
+                      Confirmed: {confirmedCount} | Total added: {totalCount}
+                    </div>
+                  </div>
+
+                  {hiresForEvent.length === 0 ? (
+                    <div style={{ marginTop: "12px", color: "#64748b", fontSize: "15px" }}>
+                      No SPs added yet for this event.
+                    </div>
+                  ) : (
+                    <div style={chipRow}>
+                      {hiresForEvent.map((hire) => (
+                        <span key={hire.id} style={hireChipStyle(hire.confirmed)}>
+                          {hire.spName}
+                          <span style={{ fontWeight: 700, opacity: 0.9 }}>
+                            {hire.confirmed ? "(Confirmed)" : "(Not Confirmed)"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSP(hire.id)}
+                            style={{
+                              border: "none",
+                              background: "transparent",
+                              cursor: "pointer",
+                              fontWeight: 900,
+                              color: hire.confirmed ? "#111111" : "#dc2626",
+                              padding: 0,
+                              marginLeft: "2px",
+                            }}
+                            aria-label={`Remove ${hire.spName}`}
+                            title="Remove SP"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </SiteShell>
+  );
+}
