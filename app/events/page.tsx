@@ -5,12 +5,14 @@ import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import {
   EventRecord,
+  formatIsoDateShort,
   getEventDateLabel,
   getEventLeads,
   getEventRooms,
   getEventSimOps,
   getSortedEvents,
 } from "../lib/planningData";
+import { AssignmentDraft, getStoredAssignments } from "../lib/mockData";
 
 type EventStatus =
   | "Needs SPs"
@@ -49,6 +51,34 @@ const statuses: EventStatus[] = [
 function saveEvents(events: EventRecord[]) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+}
+
+function normalizeText(value: string | undefined) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function getAssignedCountForEvent(event: EventRecord, assignments: AssignmentDraft[]) {
+  const seen = new Set<string>();
+
+  assignments.forEach((assignment) => {
+    const matchesById =
+      assignment.eventMode === "existing" &&
+      assignment.eventId &&
+      assignment.eventId === event.id;
+
+    const matchesByFallbackName =
+      normalizeText(assignment.eventName) === normalizeText(event.name) &&
+      normalizeText(assignment.dateText) === normalizeText(getEventDateLabel(event));
+
+    if (matchesById || matchesByFallbackName) {
+      seen.add(assignment.spId);
+    }
+  });
+
+  return seen.size;
 }
 
 function getStatusPillStyle(status: EventStatus): React.CSSProperties {
@@ -94,6 +124,7 @@ function getStatusPillStyle(status: EventStatus): React.CSSProperties {
 
 export default function EventsPage() {
   const [events, setEvents] = useState<EventRecord[]>([]);
+  const [assignments, setAssignments] = useState<AssignmentDraft[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [query, setQuery] = useState("");
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
@@ -104,7 +135,22 @@ export default function EventsPage() {
       status: event.status || "Draft",
     }));
     setEvents(nextEvents);
+    setAssignments(getStoredAssignments());
     setLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    function refreshAssignments() {
+      setAssignments(getStoredAssignments());
+    }
+
+    window.addEventListener("cfsp-assignments-updated", refreshAssignments);
+    window.addEventListener("storage", refreshAssignments);
+
+    return () => {
+      window.removeEventListener("cfsp-assignments-updated", refreshAssignments);
+      window.removeEventListener("storage", refreshAssignments);
+    };
   }, []);
 
   useEffect(() => {
@@ -179,10 +225,17 @@ export default function EventsPage() {
   const summary = useMemo(() => {
     const total = events.length;
     const drafts = events.filter((event) => event.status === "Draft").length;
-    const needsSPs = events.filter((event) => event.status === "Needs SPs").length;
+
+    const needsSPs = events.filter((event) => {
+      const assigned = getAssignedCountForEvent(event, assignments);
+      const needed = Number(event.sp_needed || 0);
+      return needed > assigned;
+    }).length;
+
     const scheduled = events.filter((event) => event.status === "Scheduled").length;
+
     return { total, drafts, needsSPs, scheduled };
-  }, [events]);
+  }, [events, assignments]);
 
   return (
     <div style={{ display: "grid", gap: 24 }}>
@@ -333,6 +386,8 @@ export default function EventsPage() {
             const simOps = getEventSimOps(event);
             const leads = getEventLeads(event);
             const sessions = event.sessions || [];
+            const assignedCount = getAssignedCountForEvent(event, assignments);
+            const neededCount = Number(event.sp_needed || 0);
 
             return (
               <div
@@ -388,7 +443,7 @@ export default function EventsPage() {
                     { label: "Dates", value: getEventDateLabel(event) },
                     { label: "Sessions", value: sessions.length },
                     { label: "Rooms", value: rooms.length },
-                    { label: "SP Coverage", value: `${event.sp_assigned} / ${event.sp_needed}` },
+                    { label: "SP Coverage", value: `${assignedCount} / ${neededCount}` },
                   ].map((item) => (
                     <div
                       key={item.label}
