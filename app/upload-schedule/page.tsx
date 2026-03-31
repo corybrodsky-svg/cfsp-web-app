@@ -19,11 +19,18 @@ export default function UploadSchedulePage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importedCount, setImportedCount] = useState(0);
+  const [importedAt, setImportedAt] = useState("");
+  const [didImport, setDidImport] = useState(false);
 
   const summary = useMemo(() => {
     const simOps = new Set<string>();
+
     for (const event of events) {
-      for (const person of event.assignedSimOps) simOps.add(person);
+      for (const person of event.assignedSimOps) {
+        simOps.add(person);
+      }
     }
 
     return {
@@ -37,6 +44,9 @@ export default function UploadSchedulePage() {
     setBusy(true);
     setError("");
     setMessage("");
+    setDidImport(false);
+    setImportedCount(0);
+    setImportedAt("");
     setFileName(file.name);
 
     try {
@@ -73,22 +83,43 @@ export default function UploadSchedulePage() {
       setError(text);
       setSessions([]);
       setEvents([]);
+      setDidImport(false);
+      setImportedCount(0);
+      setImportedAt("");
     } finally {
       setBusy(false);
     }
   }
 
-  function handleImport() {
+  async function handleImport() {
     if (events.length === 0) {
       setError("Nothing is parsed yet.");
       return;
     }
 
-    ensureSimOpUsers(events);
-    mergeImportedEvents(events);
-    setMessage(
-      `Imported ${events.length} events and synced Sim Op accounts.`
-    );
+    try {
+      setImporting(true);
+      setError("");
+      setMessage("");
+      setDidImport(false);
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      ensureSimOpUsers(events);
+      mergeImportedEvents(events);
+
+      const now = new Date();
+      setImportedCount(events.length);
+      setImportedAt(now.toLocaleString());
+      setDidImport(true);
+      setMessage(`Imported ${events.length} events and synced Sim Op accounts.`);
+    } catch (err) {
+      const text = err instanceof Error ? err.message : "Event generation failed.";
+      setError(text);
+      setDidImport(false);
+    } finally {
+      setImporting(false);
+    }
   }
 
   return (
@@ -107,7 +138,7 @@ export default function UploadSchedulePage() {
               Dashboard
             </Link>
             <Link href="/events" style={styles.linkButton}>
-              Events
+              Back to Events
             </Link>
           </div>
         </div>
@@ -115,8 +146,35 @@ export default function UploadSchedulePage() {
         {message ? <div style={styles.success}>{message}</div> : null}
         {error ? <div style={styles.error}>{error}</div> : null}
 
+        {didImport ? (
+          <div style={styles.importSummaryCard}>
+            <div style={styles.importSummaryTop}>
+              <div>
+                <div style={styles.importSummaryTitle}>Events successfully generated</div>
+                <div style={styles.importSummaryText}>
+                  {importedCount} events were added to the event store and Sim Op users were synced.
+                </div>
+                <div style={styles.importSummaryMeta}>
+                  {importedAt ? `Completed: ${importedAt}` : ""}
+                </div>
+              </div>
+
+              <div style={styles.importSummaryActions}>
+                <Link href="/events" style={styles.primaryLinkButton}>
+                  Open Events
+                </Link>
+                <Link href="/blueprints" style={styles.secondaryLinkButton}>
+                  Open Blueprints
+                </Link>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <div style={styles.card}>
-          <h2 style={styles.sectionTitle}>1. Upload Excel Schedule</h2>
+          <div style={styles.sectionRow}>
+            <h2 style={styles.sectionTitle}>1. Upload Excel Schedule</h2>
+          </div>
 
           <label style={styles.uploadBox}>
             <input
@@ -147,10 +205,12 @@ export default function UploadSchedulePage() {
             <div style={styles.summaryLabel}>Sessions Parsed</div>
             <div style={styles.summaryValue}>{summary.sessionCount}</div>
           </div>
+
           <div style={styles.summaryCard}>
             <div style={styles.summaryLabel}>Events Found</div>
             <div style={styles.summaryValue}>{summary.eventCount}</div>
           </div>
+
           <div style={styles.summaryCard}>
             <div style={styles.summaryLabel}>Sim Ops Found</div>
             <div style={styles.summaryValue}>{summary.simOpCount}</div>
@@ -160,9 +220,25 @@ export default function UploadSchedulePage() {
         <div style={styles.card}>
           <div style={styles.sectionRow}>
             <h2 style={styles.sectionTitle}>2. Preview Events</h2>
-            <button style={styles.primaryButton} onClick={handleImport}>
-              Generate Events
-            </button>
+
+            <div style={styles.actionButtons}>
+              <Link href="/events" style={styles.secondaryLinkButton}>
+                Back to Events
+              </Link>
+
+              <button
+                type="button"
+                style={{
+                  ...styles.primaryButton,
+                  opacity: importing || events.length === 0 ? 0.7 : 1,
+                  cursor: importing || events.length === 0 ? "not-allowed" : "pointer",
+                }}
+                onClick={handleImport}
+                disabled={importing || events.length === 0}
+              >
+                {importing ? "Generating..." : "Generate Events"}
+              </button>
+            </div>
           </div>
 
           {events.length === 0 ? (
@@ -184,6 +260,7 @@ export default function UploadSchedulePage() {
                         Leads: {event.leadSimOps.join(", ") || "None"}
                       </div>
                     </div>
+
                     <div style={styles.badge}>{event.sessions.length} sessions</div>
                   </div>
 
@@ -290,6 +367,42 @@ const styles: Record<string, React.CSSProperties> = {
     border: "1px solid #fecaca",
     fontWeight: 700,
   },
+  importSummaryCard: {
+    marginBottom: "18px",
+    padding: "18px 20px",
+    borderRadius: "16px",
+    background: "#ecfdf3",
+    border: "1px solid #b7ebc6",
+    boxShadow: "0 4px 16px rgba(19, 40, 72, 0.05)",
+  },
+  importSummaryTop: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "16px",
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
+  importSummaryTitle: {
+    fontSize: "22px",
+    fontWeight: 800,
+    color: "#166534",
+    marginBottom: "6px",
+  },
+  importSummaryText: {
+    color: "#166534",
+    fontWeight: 600,
+  },
+  importSummaryMeta: {
+    marginTop: "6px",
+    color: "#4b5563",
+    fontSize: "13px",
+    fontWeight: 600,
+  },
+  importSummaryActions: {
+    display: "flex",
+    gap: "10px",
+    flexWrap: "wrap",
+  },
   card: {
     background: "#fff",
     border: "1px solid #d8e0ec",
@@ -311,6 +424,11 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     flexWrap: "wrap",
     marginBottom: "16px",
+  },
+  actionButtons: {
+    display: "flex",
+    gap: "10px",
+    flexWrap: "wrap",
   },
   uploadBox: {
     display: "flex",
@@ -365,7 +483,29 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "10px",
     padding: "12px 16px",
     fontWeight: 800,
-    cursor: "pointer",
+  },
+  primaryLinkButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    textDecoration: "none",
+    background: "#1d4ed8",
+    color: "#fff",
+    borderRadius: "10px",
+    padding: "12px 16px",
+    fontWeight: 800,
+  },
+  secondaryLinkButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    textDecoration: "none",
+    background: "#ffffff",
+    color: "#183153",
+    border: "1px solid #d8e0ec",
+    borderRadius: "10px",
+    padding: "12px 16px",
+    fontWeight: 800,
   },
   emptyState: {
     border: "1px dashed #cfd8e3",
