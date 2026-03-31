@@ -269,15 +269,19 @@ export default function EventDetailPage() {
   }, [hires, rawId]);
 
   const confirmedCount = hiresForEvent.filter((hire) => hire.confirmed).length;
+  const pageTitle = event ? event.name : "Event Detail";
 
   if (!event) {
     return (
-      <SiteShell>
+      <SiteShell title="Event Detail">
         <div style={pageWrap}>
           <div style={cardStyle}>
             <h2 style={{ marginTop: 0 }}>Event not found</h2>
             <p>Return to Events and open one of the available imported event cards.</p>
-            <Link href="/events" style={{ color: "#1f5fbf", fontWeight: 700, textDecoration: "none" }}>
+            <Link
+              href="/events"
+              style={{ color: "#1f5fbf", fontWeight: 700, textDecoration: "none" }}
+            >
               ← Back to Events
             </Link>
           </div>
@@ -287,7 +291,7 @@ export default function EventDetailPage() {
   }
 
   return (
-    <SiteShell>
+    <SiteShell title={pageTitle}>
       <div style={pageWrap}>
         <div style={heroCard}>
           <Link
