@@ -295,6 +295,12 @@ const primaryButtonStyle: React.CSSProperties = {
   border: "1px solid #173d70",
 };
 
+const primaryButtonDisabledStyle: React.CSSProperties = {
+  ...primaryButtonStyle,
+  opacity: 0.7,
+  cursor: "not-allowed",
+};
+
 const successStyle: React.CSSProperties = {
   ...cardStyle,
   marginBottom: "16px",
@@ -324,6 +330,17 @@ const inputStyle: React.CSSProperties = {
 };
 
 const selectStyle: React.CSSProperties = inputStyle;
+
+const saveConfirmStyle: React.CSSProperties = {
+  marginTop: "12px",
+  padding: "12px 14px",
+  borderRadius: "12px",
+  background: "#edf9f0",
+  border: "1px solid #b7dfc4",
+  color: "#14532d",
+  fontWeight: 800,
+  fontSize: "14px",
+};
 
 function normalizeHeader(header: string) {
   return header.replace(/^\uFEFF/, "").trim();
@@ -456,6 +473,8 @@ export default function SPDirectoryPage() {
   const [assignmentNote, setAssignmentNote] = useState("");
   const [assignments, setAssignments] = useState<AssignmentDraft[]>([]);
   const [availableEvents, setAvailableEvents] = useState<AssignableEvent[]>([]);
+  const [savingSpId, setSavingSpId] = useState<string | null>(null);
+  const [recentlySavedSpId, setRecentlySavedSpId] = useState<string | null>(null);
 
   useEffect(() => {
     setAssignments(getStoredAssignments());
@@ -572,9 +591,10 @@ export default function SPDirectoryPage() {
     return assignments.filter((item) => item.spId === spId).length;
   }
 
-  function saveAssignment(sp: DirectorySP) {
+  async function saveAssignment(sp: DirectorySP) {
     setSavedMessage("");
     setErrorMessage("");
+    setRecentlySavedSpId(null);
 
     if (assignMode === "existing" && !selectedEventId) {
       setErrorMessage("Please select an event.");
@@ -608,14 +628,25 @@ export default function SPDirectoryPage() {
       createdAt: new Date().toISOString(),
     };
 
-    const next = addOrReplaceAssignment(draft);
-    setAssignments(next);
-    window.dispatchEvent(new Event("cfsp-assignments-updated"));
-    setSavedMessage(`${sp.fullName} assigned to ${draft.eventName}.`);
-    setAssignmentNote("");
-    setPlaceholderName("");
-    setPlaceholderDate("");
-    setTimeout(() => setSavedMessage(""), 2200);
+    try {
+      setSavingSpId(sp.id);
+      await new Promise((resolve) => setTimeout(resolve, 450));
+
+      const next = addOrReplaceAssignment(draft);
+      setAssignments(next);
+      window.dispatchEvent(new Event("cfsp-assignments-updated"));
+
+      setSavedMessage(`${sp.fullName} assigned to ${draft.eventName}.`);
+      setRecentlySavedSpId(sp.id);
+      setAssignmentNote("");
+      setPlaceholderName("");
+      setPlaceholderDate("");
+
+      setTimeout(() => setSavedMessage(""), 2500);
+      setTimeout(() => setRecentlySavedSpId(null), 2500);
+    } finally {
+      setSavingSpId(null);
+    }
   }
 
   return (
@@ -851,12 +882,19 @@ export default function SPDirectoryPage() {
                     <div style={buttonRowStyle}>
                       <button
                         type="button"
-                        style={primaryButtonStyle}
+                        style={savingSpId === sp.id ? primaryButtonDisabledStyle : primaryButtonStyle}
                         onClick={() => saveAssignment(sp)}
+                        disabled={savingSpId === sp.id}
                       >
-                        Save Assignment
+                        {savingSpId === sp.id ? "Saving..." : "Save Assignment"}
                       </button>
                     </div>
+
+                    {recentlySavedSpId === sp.id ? (
+                      <div style={saveConfirmStyle}>
+                        Assignment saved for {sp.fullName}.
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
