@@ -10,12 +10,13 @@ export default function EventDetailPage() {
   const params = useParams();
   const eventId = params?.id as string;
 
-  const event = events.find((e) => e.id === eventId);
+  const foundEvent = events.find((e) => e.id === eventId);
 
   const [assignments, setAssignments] = useState<EventAssignment[]>([]);
   const [selectedSpId, setSelectedSpId] = useState("");
 
-  if (!event) {
+  // 🔥 HARD GUARD — NOTHING BELOW CAN RUN WITHOUT EVENT
+  if (!foundEvent) {
     return (
       <SiteShell title="Event Not Found">
         <div style={{ padding: 20 }}>
@@ -25,6 +26,9 @@ export default function EventDetailPage() {
       </SiteShell>
     );
   }
+
+  // 🔥 AFTER GUARD → SAFE
+  const event = foundEvent;
 
   function addSP() {
     const sp = sps.find((s) => s.id === selectedSpId);
@@ -78,7 +82,7 @@ Cory
 
         <Link href="/events">← Back to Events</Link>
 
-        <h1 style={{ marginTop: 10 }}>{event.name}</h1>
+        <h1>{event.name}</h1>
         <p>{event.date} | {event.time}</p>
 
         <h3>Add SP</h3>
@@ -101,21 +105,15 @@ Cory
         <h3 style={{ marginTop: 20 }}>Assigned SPs</h3>
 
         {assignments.map((a) => (
-          <div key={a.id} style={{ marginBottom: 8 }}>
+          <div key={a.id}>
             {a.spName} ({a.spEmail})
-            <button
-              onClick={() => removeSP(a.id)}
-              style={{ marginLeft: 10 }}
-            >
+            <button onClick={() => removeSP(a.id)} style={{ marginLeft: 10 }}>
               Remove
             </button>
           </div>
         ))}
 
-        <button
-          onClick={sendEmail}
-          style={{ marginTop: 30, padding: 10 }}
-        >
+        <button onClick={sendEmail} style={{ marginTop: 30 }}>
           Generate Event Email
         </button>
 
