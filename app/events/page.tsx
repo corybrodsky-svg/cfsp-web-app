@@ -2,6 +2,15 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
+import {
+  EventRecord,
+  getEventDateLabel,
+  getEventLeads,
+  getEventRooms,
+  getEventSimOps,
+  getSortedEvents,
+} from "../lib/planningData";
 
 type EventStatus =
   | "Needs SPs"
@@ -9,31 +18,8 @@ type EventStatus =
   | "Scheduled"
   | "In Progress"
   | "Completed"
-  | "Canceled";
-
-type ImportedSession = {
-  id?: string;
-  date?: string;
-  room?: string;
-  roomRaw?: string;
-  startTime?: string;
-  endTime?: string;
-  employees?: string[];
-  lead?: string;
-};
-
-type EventItem = {
-  id: string;
-  name: string;
-  status: EventStatus;
-  date_text: string;
-  sp_needed: number;
-  sp_assigned: number;
-  updated_at: string;
-  assignedSimOps?: string[];
-  leadSimOps?: string[];
-  sessions?: ImportedSession[];
-};
+  | "Canceled"
+  | string;
 
 const STORAGE_KEY = "cfsp_events_v1";
 
@@ -60,74 +46,9 @@ const statuses: EventStatus[] = [
   "Canceled",
 ];
 
-function loadEvents(): EventItem[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveEvents(events: EventItem[]) {
+function saveEvents(events: EventRecord[]) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
-}
-
-function uniqueStrings(values: string[]) {
-  return Array.from(new Set(values.map((v) => String(v || "").trim()).filter(Boolean)));
-}
-
-function getDisplayDates(event: EventItem) {
-  const validISO = Array.from(
-    new Set(
-      (event.sessions || [])
-        .map((session) => String(session.date || ""))
-        .filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date))
-    )
-  ).sort();
-
-  const pretty = validISO
-    .map((iso) => {
-      const dt = new Date(`${iso}T00:00:00`);
-      if (Number.isNaN(dt.getTime())) return "";
-      return `${dt.getMonth() + 1}/${dt.getDate()}/${String(dt.getFullYear()).slice(-2)}`;
-    })
-    .filter(Boolean);
-
-  return pretty.length ? pretty.join(", ") : "Date TBD";
-}
-
-function formatSessionDate(value?: string) {
-  if (!value) return "TBD";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const dt = new Date(`${value}T00:00:00`);
-    if (!Number.isNaN(dt.getTime())) {
-      return `${dt.getMonth() + 1}/${dt.getDate()}/${String(dt.getFullYear()).slice(-2)}`;
-    }
-  }
-  return "TBD";
-}
-
-function summarizeRooms(event: EventItem) {
-  return uniqueStrings(
-    (event.sessions || []).map((session) => session.room || session.roomRaw || "").filter(Boolean)
-  );
-}
-
-function summarizeSimOps(event: EventItem) {
-  const direct = uniqueStrings(event.assignedSimOps || []);
-  if (direct.length) return direct;
-  return uniqueStrings((event.sessions || []).flatMap((session) => session.employees || []));
-}
-
-function summarizeLeads(event: EventItem) {
-  const direct = uniqueStrings(event.leadSimOps || []);
-  if (direct.length) return direct;
-  return uniqueStrings((event.sessions || []).map((session) => session.lead || ""));
 }
 
 function getStatusPillStyle(status: EventStatus): React.CSSProperties {
@@ -136,25 +57,25 @@ function getStatusPillStyle(status: EventStatus): React.CSSProperties {
       return {
         background: colors.redSoft,
         color: colors.red,
-        border: `1px solid #f1c9c2`,
+        border: "1px solid #f1c9c2",
       };
     case "Scheduled":
       return {
         background: colors.greenSoft,
         color: "#256b45",
-        border: `1px solid #c9e5d3`,
+        border: "1px solid #c9e5d3",
       };
     case "In Progress":
       return {
         background: "#fff6e8",
         color: "#b97814",
-        border: `1px solid #f1ddb3`,
+        border: "1px solid #f1ddb3",
       };
     case "Completed":
       return {
         background: colors.blueSoft,
         color: "#163a70",
-        border: `1px solid #cfe0f6`,
+        border: "1px solid #cfe0f6",
       };
     case "Canceled":
       return {
@@ -172,13 +93,17 @@ function getStatusPillStyle(status: EventStatus): React.CSSProperties {
 }
 
 export default function EventsPage() {
-  const [events, setEvents] = useState<EventItem[]>([]);
+  const [events, setEvents] = useState<EventRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [query, setQuery] = useState("");
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
 
   useEffect(() => {
-    setEvents(loadEvents());
+    const nextEvents = getSortedEvents().map((event) => ({
+      ...event,
+      status: event.status || "Draft",
+    }));
+    setEvents(nextEvents);
     setLoaded(true);
   }, []);
 
@@ -216,16 +141,17 @@ export default function EventsPage() {
     const q = query.trim().toLowerCase();
 
     const base = events.filter((event) => {
-      const simOps = summarizeSimOps(event).join(" ").toLowerCase();
-      const rooms = summarizeRooms(event).join(" ").toLowerCase();
-      const leads = summarizeLeads(event).join(" ").toLowerCase();
+      const simOps = getEventSimOps(event).join(" ").toLowerCase();
+      const rooms = getEventRooms(event).join(" ").toLowerCase();
+      const leads = getEventLeads(event).join(" ").toLowerCase();
+      const dates = getEventDateLabel(event).toLowerCase();
 
       if (!q) return true;
 
       return (
         event.name.toLowerCase().includes(q) ||
-        event.status.toLowerCase().includes(q) ||
-        getDisplayDates(event).toLowerCase().includes(q) ||
+        String(event.status || "").toLowerCase().includes(q) ||
+        dates.includes(q) ||
         simOps.includes(q) ||
         rooms.includes(q) ||
         leads.includes(q)
@@ -266,24 +192,42 @@ export default function EventsPage() {
           border: `1px solid ${colors.border}`,
           borderRadius: 28,
           padding: 28,
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 16,
-          alignItems: "center",
-          flexWrap: "wrap",
           boxShadow: "0 12px 28px rgba(18,55,107,0.07)",
+          display: "grid",
+          gap: 18,
         }}
       >
-        <div>
-          <div style={{ fontSize: 40, fontWeight: 900, color: colors.navy }}>Events</div>
-          <div style={{ fontSize: 17, color: colors.muted, marginTop: 10 }}>
-            Imported schedule events, expandable details, and cleaner organization.
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 16,
+            alignItems: "flex-start",
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 40, fontWeight: 900, color: colors.navy }}>Events</div>
+            <div style={{ fontSize: 17, color: colors.muted, marginTop: 10 }}>
+              Imported schedule events, expandable details, and cleaner organization.
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <Link href="/" style={navBtn}>
+              Home
+            </Link>
+            <Link href="/dashboard" style={navBtn}>
+              Dashboard
+            </Link>
+            <Link href="/sp-directory" style={navBtn}>
+              SP Directory
+            </Link>
+            <Link href="/upload-schedule" style={greenBtn}>
+              Upload Schedule
+            </Link>
           </div>
         </div>
-
-        <Link href="/upload-schedule" style={greenBtn}>
-          Upload Schedule
-        </Link>
       </section>
 
       <section
@@ -385,9 +329,9 @@ export default function EventsPage() {
         ) : (
           filteredEvents.map((event) => {
             const isExpanded = expandedIds.includes(event.id);
-            const rooms = summarizeRooms(event);
-            const simOps = summarizeSimOps(event);
-            const leads = summarizeLeads(event);
+            const rooms = getEventRooms(event);
+            const simOps = getEventSimOps(event);
+            const leads = getEventLeads(event);
             const sessions = event.sessions || [];
 
             return (
@@ -412,7 +356,9 @@ export default function EventsPage() {
                   }}
                 >
                   <div>
-                    <div style={{ fontSize: 30, fontWeight: 900, color: colors.navy }}>{event.name}</div>
+                    <div style={{ fontSize: 30, fontWeight: 900, color: colors.navy }}>
+                      {event.name}
+                    </div>
                     <div style={{ fontSize: 14, color: colors.muted, marginTop: 8 }}>
                       Last updated: {new Date(event.updated_at).toLocaleString()}
                     </div>
@@ -439,7 +385,7 @@ export default function EventsPage() {
                   }}
                 >
                   {[
-                    { label: "Dates", value: getDisplayDates(event) },
+                    { label: "Dates", value: getEventDateLabel(event) },
                     { label: "Sessions", value: sessions.length },
                     { label: "Rooms", value: rooms.length },
                     { label: "SP Coverage", value: `${event.sp_assigned} / ${event.sp_needed}` },
@@ -448,13 +394,22 @@ export default function EventsPage() {
                       key={item.label}
                       style={{
                         background: "#f8fbff",
-                        border: `1px solid #e4edf7`,
+                        border: "1px solid #e4edf7",
                         borderRadius: 16,
                         padding: 16,
                       }}
                     >
-                      <div style={{ fontSize: 12, fontWeight: 800, color: colors.muted }}>{item.label}</div>
-                      <div style={{ fontSize: 18, fontWeight: 900, color: colors.navy, marginTop: 8 }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: colors.muted }}>
+                        {item.label}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 18,
+                          fontWeight: 900,
+                          color: colors.navy,
+                          marginTop: 8,
+                        }}
+                      >
                         {item.value}
                       </div>
                     </div>
@@ -478,7 +433,7 @@ export default function EventsPage() {
                     {isExpanded ? "Hide Details" : "Expand"}
                   </button>
 
-                  <Link href={`/events/${event.id}`} style={whiteBtn}>
+                  <Link href={`/events/${encodeURIComponent(event.id)}`} style={whiteBtn}>
                     View
                   </Link>
 
@@ -516,7 +471,9 @@ export default function EventsPage() {
                       gap: 12,
                     }}
                   >
-                    <div style={{ fontSize: 20, fontWeight: 900, color: colors.navy }}>Session Schedule</div>
+                    <div style={{ fontSize: 20, fontWeight: 900, color: colors.navy }}>
+                      Session Schedule
+                    </div>
 
                     <div
                       style={{
@@ -548,7 +505,7 @@ export default function EventsPage() {
                         <tbody>
                           {sessions.map((session, index) => (
                             <tr key={session.id || `${event.id}-${index}`}>
-                              <td style={td}>{formatSessionDate(session.date)}</td>
+                              <td style={td}>{formatIsoDateShort(session.date)}</td>
                               <td style={td}>{session.startTime || "TBD"}</td>
                               <td style={td}>{session.endTime || "TBD"}</td>
                               <td style={td}>{session.room || session.roomRaw || "TBD"}</td>
@@ -573,6 +530,16 @@ export default function EventsPage() {
     </div>
   );
 }
+
+const navBtn: React.CSSProperties = {
+  textDecoration: "none",
+  background: "#ffffff",
+  color: "#12376b",
+  border: "1px solid #d4deeb",
+  borderRadius: 14,
+  padding: "12px 18px",
+  fontWeight: 900,
+};
 
 const blueBtn: React.CSSProperties = {
   background: "#1E5AA8",
