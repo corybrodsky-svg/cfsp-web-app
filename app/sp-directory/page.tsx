@@ -7,11 +7,11 @@ import {
   AssignmentDraft,
   buildUsername,
   DEFAULT_PASSWORD,
-  events,
   getStoredAssignments,
   PoolType,
   sps as mockSPs,
 } from "../lib/mockData";
+import { getSortedEvents } from "../lib/planningData";
 
 type SPRow = {
   id: string;
@@ -53,6 +53,12 @@ type DirectorySP = {
   username: string;
   defaultPassword: string;
   pool: PoolType;
+};
+
+type AssignableEvent = {
+  id: string;
+  name: string;
+  dateText: string;
 };
 
 const pageStyle: React.CSSProperties = {
@@ -444,14 +450,26 @@ export default function SPDirectoryPage() {
   const [poolFilter, setPoolFilter] = useState<"All" | PoolType>("All");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [assignMode, setAssignMode] = useState<"existing" | "placeholder">("existing");
-  const [selectedEventId, setSelectedEventId] = useState(events[0]?.id || "");
+  const [selectedEventId, setSelectedEventId] = useState("");
   const [placeholderName, setPlaceholderName] = useState("");
   const [placeholderDate, setPlaceholderDate] = useState("");
   const [assignmentNote, setAssignmentNote] = useState("");
   const [assignments, setAssignments] = useState<AssignmentDraft[]>([]);
+  const [availableEvents, setAvailableEvents] = useState<AssignableEvent[]>([]);
 
   useEffect(() => {
     setAssignments(getStoredAssignments());
+  }, []);
+
+  useEffect(() => {
+    const importedEvents = getSortedEvents().map((event) => ({
+      id: event.id,
+      name: event.name,
+      dateText: event.date_text || "Date TBD",
+    }));
+
+    setAvailableEvents(importedEvents);
+    setSelectedEventId(importedEvents[0]?.id || "");
   }, []);
 
   useEffect(() => {
@@ -558,13 +576,19 @@ export default function SPDirectoryPage() {
     setSavedMessage("");
     setErrorMessage("");
 
+    if (assignMode === "existing" && !selectedEventId) {
+      setErrorMessage("Please select an event.");
+      setTimeout(() => setErrorMessage(""), 2200);
+      return;
+    }
+
     if (assignMode === "placeholder" && !placeholderName.trim()) {
       setErrorMessage("Placeholder event name is required.");
       setTimeout(() => setErrorMessage(""), 2200);
       return;
     }
 
-    const selectedEvent = events.find((event) => event.id === selectedEventId);
+    const selectedEvent = availableEvents.find((event) => event.id === selectedEventId);
 
     const draft: AssignmentDraft = {
       id: `${sp.id}-${Date.now()}`,
@@ -608,7 +632,7 @@ export default function SPDirectoryPage() {
 
             <div style={actionRowStyle}>
               <Link href="/" style={lightButtonStyle}>Home</Link>
-              <Link href="/admin" style={lightButtonStyle}>Admin</Link>
+              <Link href="/dashboard" style={lightButtonStyle}>Dashboard</Link>
               <Link href="/events" style={lightButtonStyle}>Events</Link>
               <Link href="/login" style={darkButtonStyle}>Login</Link>
             </div>
@@ -641,6 +665,7 @@ export default function SPDirectoryPage() {
             <span style={pillStyle}>Loaded: {loading ? "..." : rows.length}</span>
             <span style={pillStyle}>Showing: {loading ? "..." : filtered.length}</span>
             <span style={pillStyle}>Assignments: {assignments.length}</span>
+            <span style={pillStyle}>Imported Events: {availableEvents.length}</span>
           </div>
         </div>
 
@@ -770,17 +795,24 @@ export default function SPDirectoryPage() {
                     {assignMode === "existing" ? (
                       <div style={{ marginTop: "14px" }}>
                         <div style={labelStyle}>Select Event</div>
-                        <select
-                          value={selectedEventId}
-                          onChange={(e) => setSelectedEventId(e.target.value)}
-                          style={selectStyle}
-                        >
-                          {events.map((event) => (
-                            <option key={event.id} value={event.id}>
-                              {event.name} — {event.dateText}
-                            </option>
-                          ))}
-                        </select>
+
+                        {availableEvents.length === 0 ? (
+                          <div style={{ color: "#9f1239", fontWeight: 700 }}>
+                            No imported events found yet. Upload and generate events first.
+                          </div>
+                        ) : (
+                          <select
+                            value={selectedEventId}
+                            onChange={(e) => setSelectedEventId(e.target.value)}
+                            style={selectStyle}
+                          >
+                            {availableEvents.map((event) => (
+                              <option key={event.id} value={event.id}>
+                                {event.name} — {event.dateText || "Date TBD"}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </div>
                     ) : (
                       <>
